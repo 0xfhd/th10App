@@ -1,9 +1,6 @@
 #import "AT10OverlayView.h"
 #import <QuartzCore/QuartzCore.h>
 
-#import "AT10OverlayView.h"
-#import <QuartzCore/QuartzCore.h>
-
 #define BLUE_DARK  [UIColor colorWithRed:0.094 green:0.373 blue:0.647 alpha:1]
 #define BLUE_MID   [UIColor colorWithRed:0.216 green:0.541 blue:0.867 alpha:1]
 #define BLACK_BTN  [UIColor colorWithRed:0.07 green:0.07 blue:0.07 alpha:1]
@@ -28,6 +25,7 @@
 @property (nonatomic,assign) NSTimeInterval accumulator;
 @property (nonatomic,assign) long          lastClicks;
 @property (nonatomic,assign) NSTimeInterval lastCPSTime;
+@property (nonatomic,strong) UIWindow      *overlayWindow;
 @end
 
 @implementation AT10OverlayView
@@ -39,7 +37,6 @@
     return i;
 }
 
-// اللمس يمر للتطبيق من تحت الأداة
 - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
     UIView *hit = [super hitTest:point withEvent:event];
     if (hit == self) return nil;
@@ -71,7 +68,7 @@
     _dotLabel = [[UILabel alloc] initWithFrame:_dot.bounds];
     _dotLabel.text = @"⌗ 10th";
     _dotLabel.font = [UIFont boldSystemFontOfSize:7.5];
-    _dotLabel.textColor = [UIColor colorWithWhite:1 alpha:0.8];
+    _dotLabel.textColor = UIColor.blackColor;
     _dotLabel.textAlignment = NSTextAlignmentCenter;
     _dotLabel.numberOfLines = 2;
     [_dot addSubview:_dotLabel];
@@ -97,6 +94,7 @@
         self->_panel.frame = f;
         self->_panel.alpha = self->_collapsed ? 0 : 1;
     }];
+    [_collapseBtn setTitle:_collapsed ? @"▼" : @"▲" forState:UIControlStateNormal];
 }
 
 - (void)handleDotPan:(UIPanGestureRecognizer *)g {
@@ -339,17 +337,43 @@
 }
 
 - (void)showInView:(UIView *)parentView {
-    self.frame = parentView.bounds;
+    // نستخدم UIWindow منفصلة عشان تكون فوق كل شيء وتخلي اللمس يوصل
+    UIWindowScene *scene = nil;
+    for (UIScene *s in UIApplication.sharedApplication.connectedScenes) {
+        if ([s isKindOfClass:[UIWindowScene class]]) {
+            scene = (UIWindowScene *)s;
+            break;
+        }
+    }
+
+    if (scene) {
+        _overlayWindow = [[UIWindow alloc] initWithWindowScene:scene];
+    } else {
+        _overlayWindow = [[UIWindow alloc] initWithFrame:UIScreen.mainScreen.bounds];
+    }
+
+    _overlayWindow.windowLevel = UIWindowLevelAlert + 1;
+    _overlayWindow.backgroundColor = UIColor.clearColor;
+    _overlayWindow.hidden = NO;
+    _overlayWindow.userInteractionEnabled = YES;
+
+    UIViewController *vc = [[UIViewController alloc] init];
+    vc.view.backgroundColor = UIColor.clearColor;
+    _overlayWindow.rootViewController = vc;
+
+    self.frame = _overlayWindow.bounds;
     _dotPos = CGPointMake(60, 200);
     _dot.center = _dotPos;
     _panel.frame = CGRectMake(16, 80, 210, 36);
-    [parentView addSubview:self];
-    [parentView bringSubviewToFront:self];
+
+    [vc.view addSubview:self];
 }
 
 - (void)hide {
     if (_running) [self toggleTapped];
     [self removeFromSuperview];
+    _overlayWindow.hidden = YES;
+    _overlayWindow = nil;
 }
 
 - (BOOL)isRunning      { return _running; }
