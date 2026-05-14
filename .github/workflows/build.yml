@@ -1,4 +1,4 @@
-name: Build AT10 IPA
+name: Build AT10 dylib
 
 on: [push]
 
@@ -9,37 +9,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build IPA
+      - name: Build dylib
         run: |
           SDK=$(xcrun --sdk iphoneos --show-sdk-path)
           
-          # كمبايل كل الملفات
-          clang \
+          clang -dynamiclib \
             -arch arm64 \
             -isysroot $SDK \
             -miphoneos-version-min=14.0 \
             -fobjc-arc \
             -framework UIKit \
             -framework Foundation \
-            -framework QuartzCore -framework CoreGraphics \
+            -framework QuartzCore \
+            -framework CoreGraphics \
             -O2 \
-            AT10App/main.m \
-            AT10App/AppDelegate.m \
             AT10App/AT10OverlayView.m \
-            -o AT10App_bin
+            AT10App/AT10Injector.m \
+            -install_name @rpath/auto10th.dylib \
+            -o auto10th.dylib
 
-          # إنشاء هيكل الـ .app
-          mkdir -p Payload/AT10App.app
-
-          cp AT10App_bin         Payload/AT10App.app/AT10App
-          cp AT10App/Info.plist  Payload/AT10App.app/Info.plist
-          chmod +x               Payload/AT10App.app/AT10App
-
-          # ضغط IPA
-          zip -r AT10App.ipa Payload
-
-      - name: Upload IPA
+      - name: Upload dylib
         uses: actions/upload-artifact@v4
         with:
-          name: AT10App-IPA
-          path: AT10App.ipa
+          name: auto10th-dylib
+          path: auto10th.dylib
