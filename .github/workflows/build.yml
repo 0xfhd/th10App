@@ -21,7 +21,7 @@ jobs:
             -fobjc-arc \
             -framework UIKit \
             -framework Foundation \
-            -framework QuartzCore \
+            -framework QuartzCore -framework CoreGraphics \
             -O2 \
             AT10App/main.m \
             AT10App/AppDelegate.m \
