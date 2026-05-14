@@ -1,6 +1,3 @@
-//  AT10OverlayView.m
-//  © AsT7aLh — All Rights Reserved — استحالة ⌗ 10th
-
 #import "AT10OverlayView.h"
 #import <QuartzCore/QuartzCore.h>
 
@@ -40,6 +37,12 @@
     return i;
 }
 
+- (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
+    UIView *hit = [super hitTest:point withEvent:event];
+    if (hit == self) return nil;
+    return hit;
+}
+
 - (instancetype)initWithFrame:(CGRect)frame {
     self = [super initWithFrame:frame];
     if (self) {
@@ -53,8 +56,6 @@
     return self;
 }
 
-#pragma mark - الدائرة
-
 - (void)buildDot {
     _dot = [[UIView alloc] initWithFrame:CGRectMake(0,0,46,46)];
     _dot.backgroundColor = UIColor.whiteColor;
@@ -66,7 +67,6 @@
     _dot.layer.shadowRadius  = 6;
     _dot.layer.shadowOffset  = CGSizeMake(0,2);
     _dot.layer.masksToBounds = NO;
-
     _dotLabel = [[UILabel alloc] initWithFrame:_dot.bounds];
     _dotLabel.text = @"⌗ 10th";
     _dotLabel.font = [UIFont boldSystemFontOfSize:7.5];
@@ -74,7 +74,6 @@
     _dotLabel.textAlignment = NSTextAlignmentCenter;
     _dotLabel.numberOfLines = 2;
     [_dot addSubview:_dotLabel];
-
     UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc]
         initWithTarget:self action:@selector(handleDotPan:)];
     [_dot addGestureRecognizer:pan];
@@ -92,8 +91,6 @@
     [g setTranslation:CGPointZero inView:self];
 }
 
-#pragma mark - القائمة
-
 - (void)buildPanel {
     _panel = [[UIView alloc] initWithFrame:CGRectMake(16,80,210,0)];
     _panel.backgroundColor = UIColor.whiteColor;
@@ -105,8 +102,6 @@
     _panel.layer.shadowRadius = 10;
     _panel.layer.shadowOffset = CGSizeMake(0,3);
     _panel.clipsToBounds = YES;
-
-    // هيدر
     UIView *hdr = [[UIView alloc] initWithFrame:CGRectMake(0,0,210,36)];
     CAGradientLayer *g = [CAGradientLayer layer];
     g.frame = hdr.bounds;
@@ -114,13 +109,11 @@
     g.startPoint = CGPointMake(0,0.5);
     g.endPoint   = CGPointMake(1,0.5);
     [hdr.layer addSublayer:g];
-
     UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(10,0,155,36)];
     title.text = @"⌗ 10th — AsT7aLh";
     title.font = [UIFont boldSystemFontOfSize:10.5];
     title.textColor = UIColor.whiteColor;
     [hdr addSubview:title];
-
     _collapseBtn = [UIButton buttonWithType:UIButtonTypeCustom];
     _collapseBtn.frame = CGRectMake(174,6,24,24);
     _collapseBtn.backgroundColor = [UIColor colorWithWhite:1 alpha:0.18];
@@ -130,20 +123,14 @@
     [_collapseBtn addTarget:self action:@selector(toggleCollapse)
           forControlEvents:UIControlEventTouchUpInside];
     [hdr addSubview:_collapseBtn];
-
     UIPanGestureRecognizer *panG = [[UIPanGestureRecognizer alloc]
         initWithTarget:self action:@selector(handlePanelPan:)];
     [hdr addGestureRecognizer:panG];
     [_panel addSubview:hdr];
-
-    // body
     _panelBody = [[UIView alloc] initWithFrame:CGRectMake(0,36,210,240)];
     _panelBody.backgroundColor = UIColor.clearColor;
     [_panel addSubview:_panelBody];
-
     int y = 10;
-
-    // زر التفعيل
     _toggleBtn = [UIButton buttonWithType:UIButtonTypeCustom];
     _toggleBtn.frame = CGRectMake(10,y,190,38);
     _toggleBtn.layer.cornerRadius = 9;
@@ -155,18 +142,14 @@
         forControlEvents:UIControlEventTouchUpInside];
     [_panelBody addSubview:_toggleBtn];
     y += 48;
-
-    // السرعة
     UILabel *spdTitle = [self lbl:@"السرعة" x:10 y:y w:100 bold:YES small:YES];
     spdTitle.textColor = [UIColor colorWithRed:0.48 green:0.70 blue:0.88 alpha:1];
     [_panelBody addSubview:spdTitle];
-
     _speedValLabel = [self lbl:@"أقصى سرعة" x:110 y:y w:90 bold:YES small:YES];
     _speedValLabel.textAlignment = NSTextAlignmentRight;
     _speedValLabel.textColor = BLUE_DARK;
     [_panelBody addSubview:_speedValLabel];
     y += 18;
-
     _speedSlider = [[UISlider alloc] initWithFrame:CGRectMake(10,y,190,28)];
     _speedSlider.minimumValue = 1;
     _speedSlider.maximumValue = 120;
@@ -175,7 +158,6 @@
     [_speedSlider addTarget:self action:@selector(speedChanged)
           forControlEvents:UIControlEventValueChanged];
     [_panelBody addSubview:_speedSlider];
-
     UILabel *slow = [self lbl:@"أبطأ" x:10 y:y+28 w:40 bold:NO small:YES];
     slow.textColor = [UIColor colorWithRed:0.66 green:0.78 blue:0.93 alpha:1];
     UILabel *fast = [self lbl:@"أسرع" x:160 y:y+28 w:40 bold:NO small:YES];
@@ -184,19 +166,14 @@
     [_panelBody addSubview:slow];
     [_panelBody addSubview:fast];
     y += 48;
-
-    // إحصاءات — إصلاح مشكلة الـ pointer
     UIView *row1 = [self makeStatRow:@"السرعة الفعلية:" val:@"—" x:10 y:y];
     _cpsLabel = (UILabel *)[row1 viewWithTag:99];
     [_panelBody addSubview:row1];
     y += 26;
-
     UIView *row2 = [self makeStatRow:@"النقرات:" val:@"0" x:10 y:y];
     _cntLabel = (UILabel *)[row2 viewWithTag:99];
     [_panelBody addSubview:row2];
     y += 26;
-
-    // الحقوق
     UILabel *cr = [self lbl:@"⌗ 10th | AsT7aLh | استحالة" x:10 y:y w:190 bold:NO small:YES];
     cr.textAlignment = NSTextAlignmentCenter;
     cr.textColor = [UIColor colorWithRed:0.66 green:0.78 blue:0.93 alpha:1];
@@ -205,7 +182,6 @@
     cr.layer.masksToBounds = YES;
     [_panelBody addSubview:cr];
     y += 22;
-
     _panelBody.frame = CGRectMake(0,36,210,y+10);
     _panel.frame = CGRectMake(16,80,210,36+y+10);
     [self addSubview:_panel];
@@ -216,21 +192,18 @@
     row.backgroundColor = [UIColor colorWithRed:0.94 green:0.97 blue:1.0 alpha:1];
     row.layer.cornerRadius = 6;
     row.clipsToBounds = YES;
-
     UILabel *tl = [[UILabel alloc] initWithFrame:CGRectMake(8,2,100,18)];
     tl.text = title;
     tl.font = [UIFont systemFontOfSize:9.5];
     tl.textColor = BLUE_DARK;
     [row addSubview:tl];
-
     UILabel *vl = [[UILabel alloc] initWithFrame:CGRectMake(100,2,82,18)];
     vl.text = val;
     vl.font = [UIFont boldSystemFontOfSize:10];
     vl.textColor = BLUE_DARK;
     vl.textAlignment = NSTextAlignmentRight;
-    vl.tag = 99; // عشان نرجعله بعدين
+    vl.tag = 99;
     [row addSubview:vl];
-
     return row;
 }
 
@@ -289,8 +262,6 @@
     [_collapseBtn setTitle:_collapsed ? @"▼" : @"▲" forState:UIControlStateNormal];
 }
 
-#pragma mark - التشغيل
-
 - (void)speedChanged {
     int v = (int)_speedSlider.value;
     _cps = v;
@@ -343,8 +314,6 @@
         });
     }
 }
-
-#pragma mark - عرض وإخفاء
 
 - (void)showInView:(UIView *)parentView {
     self.frame = parentView.bounds;
