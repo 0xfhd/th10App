@@ -1,9 +1,11 @@
 #import "AT10OverlayView.h"
 #import <QuartzCore/QuartzCore.h>
 
+#import "AT10OverlayView.h"
+#import <QuartzCore/QuartzCore.h>
+
 #define BLUE_DARK  [UIColor colorWithRed:0.094 green:0.373 blue:0.647 alpha:1]
 #define BLUE_MID   [UIColor colorWithRed:0.216 green:0.541 blue:0.867 alpha:1]
-#define BLUE_LIGHT [UIColor colorWithRed:0.902 green:0.945 blue:0.984 alpha:1]
 #define BLACK_BTN  [UIColor colorWithRed:0.07 green:0.07 blue:0.07 alpha:1]
 
 @interface AT10OverlayView()
@@ -37,6 +39,7 @@
     return i;
 }
 
+// اللمس يمر للتطبيق من تحت الأداة
 - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
     UIView *hit = [super hitTest:point withEvent:event];
     if (hit == self) return nil;
@@ -48,7 +51,8 @@
     if (self) {
         self.backgroundColor = UIColor.clearColor;
         self.userInteractionEnabled = YES;
-        _cps = 120;
+        _cps = 500;
+        _collapsed = YES;
         _credit = @"⌗ 10th | AsT7aLh | استحالة";
         [self buildDot];
         [self buildPanel];
@@ -58,30 +62,44 @@
 
 - (void)buildDot {
     _dot = [[UIView alloc] initWithFrame:CGRectMake(0,0,46,46)];
-    _dot.backgroundColor = UIColor.whiteColor;
+    _dot.backgroundColor = [UIColor colorWithWhite:1 alpha:0.15];
     _dot.layer.cornerRadius = 23;
-    _dot.layer.borderWidth = 2.5;
-    _dot.layer.borderColor = BLUE_MID.CGColor;
-    _dot.layer.shadowColor  = BLUE_MID.CGColor;
-    _dot.layer.shadowOpacity = 0.25;
-    _dot.layer.shadowRadius  = 6;
-    _dot.layer.shadowOffset  = CGSizeMake(0,2);
-    _dot.layer.masksToBounds = NO;
+    _dot.layer.borderWidth = 2;
+    _dot.layer.borderColor = [UIColor colorWithRed:0.216 green:0.541 blue:0.867 alpha:0.6].CGColor;
+    _dot.layer.masksToBounds = YES;
+
     _dotLabel = [[UILabel alloc] initWithFrame:_dot.bounds];
     _dotLabel.text = @"⌗ 10th";
     _dotLabel.font = [UIFont boldSystemFontOfSize:7.5];
-    _dotLabel.textColor = BLUE_DARK;
+    _dotLabel.textColor = [UIColor colorWithWhite:1 alpha:0.8];
     _dotLabel.textAlignment = NSTextAlignmentCenter;
     _dotLabel.numberOfLines = 2;
     [_dot addSubview:_dotLabel];
+
     UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc]
         initWithTarget:self action:@selector(handleDotPan:)];
     [_dot addGestureRecognizer:pan];
+
+    UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc]
+        initWithTarget:self action:@selector(dotTapped)];
+    tap.numberOfTapsRequired = 1;
+    [_dot addGestureRecognizer:tap];
+
     [self addSubview:_dot];
 }
 
+- (void)dotTapped {
+    _collapsed = !_collapsed;
+    [UIView animateWithDuration:0.25 animations:^{
+        self->_panelBody.alpha = self->_collapsed ? 0 : 1;
+        CGRect f = self->_panel.frame;
+        f.size.height = self->_collapsed ? 36 : 36 + self->_panelBody.bounds.size.height;
+        self->_panel.frame = f;
+        self->_panel.alpha = self->_collapsed ? 0 : 1;
+    }];
+}
+
 - (void)handleDotPan:(UIPanGestureRecognizer *)g {
-    if (_running) return;
     CGPoint t = [g translationInView:self];
     _dot.center = CGPointMake(
         MAX(23, MIN(self.bounds.size.width-23,  _dot.center.x + t.x)),
@@ -92,7 +110,8 @@
 }
 
 - (void)buildPanel {
-    _panel = [[UIView alloc] initWithFrame:CGRectMake(16,80,210,0)];
+    _panel = [[UIView alloc] initWithFrame:CGRectMake(16,80,210,36)];
+    _panel.alpha = 0;
     _panel.backgroundColor = UIColor.whiteColor;
     _panel.layer.cornerRadius = 14;
     _panel.layer.borderWidth  = 1.5;
@@ -102,6 +121,7 @@
     _panel.layer.shadowRadius = 10;
     _panel.layer.shadowOffset = CGSizeMake(0,3);
     _panel.clipsToBounds = YES;
+
     UIView *hdr = [[UIView alloc] initWithFrame:CGRectMake(0,0,210,36)];
     CAGradientLayer *g = [CAGradientLayer layer];
     g.frame = hdr.bounds;
@@ -109,28 +129,35 @@
     g.startPoint = CGPointMake(0,0.5);
     g.endPoint   = CGPointMake(1,0.5);
     [hdr.layer addSublayer:g];
+
     UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(10,0,155,36)];
     title.text = @"⌗ 10th — AsT7aLh";
     title.font = [UIFont boldSystemFontOfSize:10.5];
     title.textColor = UIColor.whiteColor;
     [hdr addSubview:title];
+
     _collapseBtn = [UIButton buttonWithType:UIButtonTypeCustom];
     _collapseBtn.frame = CGRectMake(174,6,24,24);
     _collapseBtn.backgroundColor = [UIColor colorWithWhite:1 alpha:0.18];
     _collapseBtn.layer.cornerRadius = 6;
-    [_collapseBtn setTitle:@"▲" forState:UIControlStateNormal];
+    [_collapseBtn setTitle:@"▼" forState:UIControlStateNormal];
     _collapseBtn.titleLabel.font = [UIFont systemFontOfSize:11];
-    [_collapseBtn addTarget:self action:@selector(toggleCollapse)
+    [_collapseBtn addTarget:self action:@selector(dotTapped)
           forControlEvents:UIControlEventTouchUpInside];
     [hdr addSubview:_collapseBtn];
+
     UIPanGestureRecognizer *panG = [[UIPanGestureRecognizer alloc]
         initWithTarget:self action:@selector(handlePanelPan:)];
     [hdr addGestureRecognizer:panG];
     [_panel addSubview:hdr];
+
     _panelBody = [[UIView alloc] initWithFrame:CGRectMake(0,36,210,240)];
     _panelBody.backgroundColor = UIColor.clearColor;
+    _panelBody.alpha = 0;
     [_panel addSubview:_panelBody];
+
     int y = 10;
+
     _toggleBtn = [UIButton buttonWithType:UIButtonTypeCustom];
     _toggleBtn.frame = CGRectMake(10,y,190,38);
     _toggleBtn.layer.cornerRadius = 9;
@@ -142,22 +169,26 @@
         forControlEvents:UIControlEventTouchUpInside];
     [_panelBody addSubview:_toggleBtn];
     y += 48;
+
     UILabel *spdTitle = [self lbl:@"السرعة" x:10 y:y w:100 bold:YES small:YES];
     spdTitle.textColor = [UIColor colorWithRed:0.48 green:0.70 blue:0.88 alpha:1];
     [_panelBody addSubview:spdTitle];
+
     _speedValLabel = [self lbl:@"أقصى سرعة" x:110 y:y w:90 bold:YES small:YES];
     _speedValLabel.textAlignment = NSTextAlignmentRight;
     _speedValLabel.textColor = BLUE_DARK;
     [_panelBody addSubview:_speedValLabel];
     y += 18;
+
     _speedSlider = [[UISlider alloc] initWithFrame:CGRectMake(10,y,190,28)];
     _speedSlider.minimumValue = 1;
-    _speedSlider.maximumValue = 120;
-    _speedSlider.value = 120;
+    _speedSlider.maximumValue = 500;
+    _speedSlider.value = 500;
     _speedSlider.tintColor = BLUE_DARK;
     [_speedSlider addTarget:self action:@selector(speedChanged)
           forControlEvents:UIControlEventValueChanged];
     [_panelBody addSubview:_speedSlider];
+
     UILabel *slow = [self lbl:@"أبطأ" x:10 y:y+28 w:40 bold:NO small:YES];
     slow.textColor = [UIColor colorWithRed:0.66 green:0.78 blue:0.93 alpha:1];
     UILabel *fast = [self lbl:@"أسرع" x:160 y:y+28 w:40 bold:NO small:YES];
@@ -166,14 +197,17 @@
     [_panelBody addSubview:slow];
     [_panelBody addSubview:fast];
     y += 48;
+
     UIView *row1 = [self makeStatRow:@"السرعة الفعلية:" val:@"—" x:10 y:y];
     _cpsLabel = (UILabel *)[row1 viewWithTag:99];
     [_panelBody addSubview:row1];
     y += 26;
+
     UIView *row2 = [self makeStatRow:@"النقرات:" val:@"0" x:10 y:y];
     _cntLabel = (UILabel *)[row2 viewWithTag:99];
     [_panelBody addSubview:row2];
     y += 26;
+
     UILabel *cr = [self lbl:@"⌗ 10th | AsT7aLh | استحالة" x:10 y:y w:190 bold:NO small:YES];
     cr.textAlignment = NSTextAlignmentCenter;
     cr.textColor = [UIColor colorWithRed:0.66 green:0.78 blue:0.93 alpha:1];
@@ -182,8 +216,8 @@
     cr.layer.masksToBounds = YES;
     [_panelBody addSubview:cr];
     y += 22;
+
     _panelBody.frame = CGRectMake(0,36,210,y+10);
-    _panel.frame = CGRectMake(16,80,210,36+y+10);
     [self addSubview:_panel];
 }
 
@@ -251,21 +285,10 @@
     [g setTranslation:CGPointZero inView:self];
 }
 
-- (void)toggleCollapse {
-    _collapsed = !_collapsed;
-    [UIView animateWithDuration:0.25 animations:^{
-        self->_panelBody.alpha = self->_collapsed ? 0 : 1;
-        CGRect f = self->_panel.frame;
-        f.size.height = self->_collapsed ? 36 : 36 + self->_panelBody.bounds.size.height;
-        self->_panel.frame = f;
-    }];
-    [_collapseBtn setTitle:_collapsed ? @"▼" : @"▲" forState:UIControlStateNormal];
-}
-
 - (void)speedChanged {
     int v = (int)_speedSlider.value;
     _cps = v;
-    _speedValLabel.text = v >= 120 ? @"أقصى سرعة" : [NSString stringWithFormat:@"%d ن/ث", v];
+    _speedValLabel.text = v >= 500 ? @"أقصى سرعة" : [NSString stringWithFormat:@"%d ن/ث", v];
 }
 
 - (void)toggleTapped {
@@ -297,9 +320,9 @@
         _clicks++;
         if (self.onTap) self.onTap(_dotPos);
         dispatch_async(dispatch_get_main_queue(), ^{
-            self->_dot.backgroundColor = [UIColor colorWithRed:0.84 green:0.91 blue:0.97 alpha:1];
+            self->_dot.backgroundColor = [UIColor colorWithRed:0.84 green:0.91 blue:0.97 alpha:0.4];
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 40*NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
-                self->_dot.backgroundColor = UIColor.whiteColor;
+                self->_dot.backgroundColor = [UIColor colorWithWhite:1 alpha:0.15];
             });
         });
     }
@@ -317,9 +340,11 @@
 
 - (void)showInView:(UIView *)parentView {
     self.frame = parentView.bounds;
-    _dotPos = CGPointMake(parentView.bounds.size.width/2, parentView.bounds.size.height/2);
+    _dotPos = CGPointMake(60, 200);
     _dot.center = _dotPos;
+    _panel.frame = CGRectMake(16, 80, 210, 36);
     [parentView addSubview:self];
+    [parentView bringSubviewToFront:self];
 }
 
 - (void)hide {
