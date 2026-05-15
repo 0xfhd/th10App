@@ -1,49 +1,45 @@
 #import <UIKit/UIKit.h>
-#import "AT10OverlayView.h"
+#import <dlfcn.h>
 #import <mach/mach_time.h>
+#import "AT10OverlayView.h"
 
 typedef struct __IOHIDEvent *IOHIDEventRef;
 
-extern IOHIDEventRef IOHIDEventCreateDigitizerFingerEvent(
-    CFAllocatorRef allocator,
-    uint64_t timeStamp,
-    uint32_t index,
-    uint32_t identity,
-    uint32_t eventMask,
-    double x, double y, double z,
-    double tipPressure, double twist,
-    uint32_t range, bool touch,
-    bool ignorance, uint32_t options
+typedef IOHIDEventRef (*IOHIDEventCreateDigitizerFingerEventFunc)(
+    CFAllocatorRef, uint64_t, uint32_t, uint32_t, uint32_t,
+    double, double, double, double, double,
+    uint32_t, bool, bool, uint32_t
 );
 
-extern void IOHIDEventSetIntegerValue(IOHIDEventRef event, int field, int value);
-extern CFTypeRef UIApplicationSendEvent(UIApplication *app, IOHIDEventRef event);
+typedef void (*UIApplicationSendEventFunc)(UIApplication *, IOHIDEventRef);
 
 static void simulateTap(CGPoint point) {
+    void *handle = dlopen("/System/Library/PrivateFrameworks/BackBoardServices.framework/BackBoardServices", RTLD_LAZY);
+    if (!handle) return;
+
+    IOHIDEventCreateDigitizerFingerEventFunc createEvent =
+        (IOHIDEventCreateDigitizerFingerEventFunc)dlsym(handle, "IOHIDEventCreateDigitizerFingerEvent");
+
+    UIApplicationSendEventFunc sendEvent =
+        (UIApplicationSendEventFunc)dlsym(RTLD_DEFAULT, "UIApplicationSendEvent");
+
+    if (!createEvent || !sendEvent) { dlclose(handle); return; }
+
     CGSize screen = UIScreen.mainScreen.bounds.size;
     double x = point.x / screen.width;
     double y = point.y / screen.height;
     uint64_t ts = mach_absolute_time();
 
-    IOHIDEventRef down = IOHIDEventCreateDigitizerFingerEvent(
-        kCFAllocatorDefault, ts, 0, 1, 0x3,
-        x, y, 0, 1.0, 0, 1, true, false, 0
-    );
-    IOHIDEventRef up = IOHIDEventCreateDigitizerFingerEvent(
-        kCFAllocatorDefault, ts + 1000000, 0, 1, 0x3,
-        x, y, 0, 0.0, 0, 0, false, false, 0
-    );
+    IOHIDEventRef down = createEvent(kCFAllocatorDefault, ts, 0, 1, 0x3, x, y, 0, 1.0, 0, 1, true, false, 0);
+    IOHIDEventRef up   = createEvent(kCFAllocatorDefault, ts + 1000000, 0, 1, 0x3, x, y, 0, 0.0, 0, 0, false, false, 0);
 
-    if (down) {
-        UIApplicationSendEvent(UIApplication.sharedApplication, down);
-        CFRelease(down);
-    }
+    if (down) { sendEvent(UIApplication.sharedApplication, down); CFRelease(down); }
+
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 20*NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
-        if (up) {
-            UIApplicationSendEvent(UIApplication.sharedApplication, up);
-            CFRelease(up);
-        }
+        if (up) { sendEvent(UIApplication.sharedApplication, up); CFRelease(up); }
     });
+
+    dlclose(handle);
 }
 
 __attribute__((constructor))
