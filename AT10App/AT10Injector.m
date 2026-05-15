@@ -1,5 +1,4 @@
 #import <UIKit/UIKit.h>
-#import <dlfcn.h>
 #import "AT10OverlayView.h"
 
 static void simulateTap(CGPoint point) {
@@ -17,29 +16,32 @@ static void simulateTap(CGPoint point) {
     if (!targetWindow) return;
 
     UIView *targetView = [targetWindow hitTest:point withEvent:nil];
-    if (!targetView) targetView = targetWindow;
+    if (!targetView) return;
 
-    SEL began = NSSelectorFromString(@"touchesBegan:withEvent:");
-    SEL ended = NSSelectorFromString(@"touchesEnded:withEvent:");
-    NSSet *empty = [NSSet set];
-    UIEvent *ev = [[UIEvent alloc] init];
+    // اذا كان زر نضغطه مباشرة
+    if ([targetView isKindOfClass:[UIButton class]]) {
+        [(UIButton *)targetView sendActionsForControlEvents:UIControlEventTouchUpInside];
+        return;
+    }
 
-    if ([targetView respondsToSelector:began])
-        [targetView performSelector:began withObject:empty withObject:ev];
-
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 30*NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
-        if ([targetView respondsToSelector:ended])
-            [targetView performSelector:ended withObject:empty withObject:ev];
-    });
+    // غير كذا نرسل notification
+    [[NSNotificationCenter defaultCenter]
+        postNotificationName:@"AT10TapNotification"
+        object:nil
+        userInfo:@{@"point": [NSValue valueWithCGPoint:point],
+                   @"view": targetView}];
 }
 
-static void autoStart(void);
-
-__attribute__((constructor)) static void autoStart(void) {
+__attribute__((constructor))
+static void autoStart(void) {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)),
         dispatch_get_main_queue(), ^{
             AT10OverlayView *overlay = [AT10OverlayView sharedOverlay];
-            overlay.onTap = ^(CGPoint pos) { simulateTap(pos); };
+            overlay.onTap = ^(CGPoint pos) {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    simulateTap(pos);
+                });
+            };
             [overlay showInView:nil];
         });
 }
