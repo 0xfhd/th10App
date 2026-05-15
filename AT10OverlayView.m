@@ -53,7 +53,6 @@
     }
     return self;
 }
-
 #pragma mark - الدائرة
 
 - (void)buildDot {
@@ -141,7 +140,6 @@
     [_panel addSubview:_panelBody];
 
     int y = 10;
-
     _toggleBtn = [UIButton buttonWithType:UIButtonTypeCustom];
     _toggleBtn.frame = CGRectMake(10,y,190,38);
     _toggleBtn.layer.cornerRadius = 9;
@@ -228,10 +226,10 @@
 
     return row;
 }
-
 - (void)setButtonBlue {
     for (CALayer *l in _toggleBtn.layer.sublayers)
         if ([l isKindOfClass:[CAGradientLayer class]]) { [l removeFromSuperlayer]; break; }
+
     CAGradientLayer *g = [CAGradientLayer layer];
     g.frame = _toggleBtn.bounds;
     g.cornerRadius = 9;
@@ -239,6 +237,7 @@
     g.startPoint = CGPointMake(0,0.5);
     g.endPoint   = CGPointMake(1,0.5);
     [_toggleBtn.layer insertSublayer:g atIndex:0];
+
     _toggleBtn.backgroundColor = UIColor.clearColor;
     _toggleBtn.layer.shadowColor   = BLUE_DARK.CGColor;
     _toggleBtn.layer.shadowOpacity = 0.30;
@@ -249,6 +248,7 @@
 - (void)setButtonBlack {
     for (CALayer *l in _toggleBtn.layer.sublayers)
         if ([l isKindOfClass:[CAGradientLayer class]]) { [l removeFromSuperlayer]; break; }
+
     _toggleBtn.backgroundColor    = BLACK_BTN;
     _toggleBtn.layer.shadowColor   = UIColor.blackColor.CGColor;
     _toggleBtn.layer.shadowOpacity = 0.30;
@@ -266,21 +266,30 @@
 
 - (void)handlePanelPan:(UIPanGestureRecognizer *)g {
     CGPoint t = [g translationInView:self];
+
     _panel.center = CGPointMake(
-        MAX(_panel.bounds.size.width/2,  MIN(self.bounds.size.width  - _panel.bounds.size.width/2,  _panel.center.x + t.x)),
-        MAX(_panel.bounds.size.height/2, MIN(self.bounds.size.height - _panel.bounds.size.height/2, _panel.center.y + t.y))
+        MAX(_panel.bounds.size.width/2,
+            MIN(self.bounds.size.width - _panel.bounds.size.width/2,
+                _panel.center.x + t.x)),
+        MAX(_panel.bounds.size.height/2,
+            MIN(self.bounds.size.height - _panel.bounds.size.height/2,
+                _panel.center.y + t.y))
     );
+
     [g setTranslation:CGPointZero inView:self];
 }
 
 - (void)toggleCollapse {
     _collapsed = !_collapsed;
+
     [UIView animateWithDuration:0.25 animations:^{
         self->_panelBody.alpha = self->_collapsed ? 0 : 1;
+
         CGRect f = self->_panel.frame;
         f.size.height = self->_collapsed ? 36 : 36 + self->_panelBody.bounds.size.height;
         self->_panel.frame = f;
     }];
+
     [_collapseBtn setTitle:_collapsed ? @"▼" : @"▲" forState:UIControlStateNormal];
 }
 
@@ -289,7 +298,10 @@
 - (void)speedChanged {
     int v = (int)_speedSlider.value;
     _cps = v;
-    _speedValLabel.text = v >= 120 ? @"أقصى سرعة" : [NSString stringWithFormat:@"%d ن/ث", v];
+
+    _speedValLabel.text = v >= 120
+        ? @"أقصى سرعة"
+        : [NSString stringWithFormat:@"%d ن/ث", v];
 }
 
 - (void)toggleTapped {
@@ -298,71 +310,102 @@
         _accumulator = 0;
         _lastClicks = _clicks;
         _lastCPSTime = CACurrentMediaTime();
+
         _ticker = [CADisplayLink displayLinkWithTarget:self selector:@selector(tick:)];
         _ticker.preferredFramesPerSecond = 0;
         [_ticker addToRunLoop:NSRunLoop.mainRunLoop forMode:NSRunLoopCommonModes];
+
         [self setButtonBlack];
         [_toggleBtn setTitle:@"⏹  إيقاف" forState:UIControlStateNormal];
+
     } else {
         _running = NO;
-        [_ticker invalidate]; _ticker = nil;
+
+        [_ticker invalidate];
+        _ticker = nil;
+
         [self setButtonBlue];
         [_toggleBtn setTitle:@"▶  تفعيل" forState:UIControlStateNormal];
+
         _cpsLabel.text = @"—";
     }
 }
 
 - (void)tick:(CADisplayLink *)dl {
     if (!_running) return;
+
     _accumulator += dl.duration;
     double interval = 1.0 / MAX(1, _cps);
+
     while (_accumulator >= interval) {
         _accumulator -= interval;
         _clicks++;
-        if (self.onTap) self.onTap(_dotPos);
+
+        if (self.onTap)
+            self.onTap(_dotPos);
+
         dispatch_async(dispatch_get_main_queue(), ^{
             self->_dot.backgroundColor = [UIColor colorWithRed:0.84 green:0.91 blue:0.97 alpha:1];
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 40*NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
+
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 40*NSEC_PER_MSEC),
+                           dispatch_get_main_queue(), ^{
                 self->_dot.backgroundColor = UIColor.whiteColor;
             });
         });
     }
+
     NSTimeInterval now = CACurrentMediaTime();
+
     if (now - _lastCPSTime >= 1.0) {
         long diff = _clicks - _lastClicks;
         _lastClicks = _clicks;
         _lastCPSTime = now;
+
         dispatch_async(dispatch_get_main_queue(), ^{
             self->_cpsLabel.text = [NSString stringWithFormat:@"%ld ن/ث", diff];
             self->_cntLabel.text = [NSString stringWithFormat:@"%ld", self->_clicks];
         });
     }
 }
-
 #pragma mark - عرض وإخفاء
 
 - (void)showInView:(UIView *)parentView {
     self.frame = parentView.bounds;
-    _dotPos = CGPointMake(parentView.bounds.size.width/2, parentView.bounds.size.height/2);
+
+    _dotPos = CGPointMake(parentView.bounds.size.width/2,
+                          parentView.bounds.size.height/2);
+
     _dot.center = _dotPos;
+
     [parentView addSubview:self];
+    [parentView bringSubviewToFront:self];
 }
 
 - (void)hide {
-    if (_running) [self toggleTapped];
+    if (_running)
+        [self toggleTapped];
+
     [self removeFromSuperview];
 }
 
-- (BOOL)isRunning      { return _running; }
-- (CGPoint)dotPosition { return _dotPos; }
-- (long)totalClicks    { return _clicks; }
+- (BOOL)isRunning {
+    return _running;
+}
+
+- (CGPoint)dotPosition {
+    return _dotPos;
+}
+
+- (long)totalClicks {
+    return _clicks;
+}
 
 #pragma mark - إصلاح اللمسات (الأهم)
 
 - (BOOL)pointInside:(CGPoint)point withEvent:(UIEvent *)event {
 
-    CGPoint p = [
-    [self convertPoint:point toView:self];
+    // تحويل النقطة لإحداثيات نفس الـ view
+    CGPoint p = [self convertPoint:point toView:self];
 
     // لو اللمس على الدائرة
     if (CGRectContainsPoint(self.dot.frame, p)) {
@@ -377,4 +420,5 @@
     // أي مكان ثاني → مرر اللمس للعبة
     return NO;
 }
+
 @end
