@@ -5,7 +5,6 @@
 #define BLUE_MID   [UIColor colorWithRed:0.216 green:0.541 blue:0.867 alpha:1]
 #define BLACK_BTN  [UIColor colorWithRed:0.07 green:0.07 blue:0.07 alpha:1]
 
-// نافذة شفافة تخلي اللمس يمر للتطبيق
 @interface AT10PassthroughWindow : UIWindow
 @end
 @implementation AT10PassthroughWindow
@@ -22,8 +21,6 @@
 @property (nonatomic,strong) UIView        *panel;
 @property (nonatomic,strong) UIButton      *toggleBtn;
 @property (nonatomic,strong) UISlider      *speedSlider;
-@property (nonatomic,strong) UILabel       *cpsLabel;
-@property (nonatomic,strong) UILabel       *cntLabel;
 @property (nonatomic,strong) UILabel       *speedValLabel;
 @property (nonatomic,strong) UIView        *panelBody;
 @property (nonatomic,strong) UIButton      *collapseBtn;
@@ -34,8 +31,6 @@
 @property (nonatomic,assign) NSInteger     cps;
 @property (nonatomic,strong) CADisplayLink *ticker;
 @property (nonatomic,assign) NSTimeInterval accumulator;
-@property (nonatomic,assign) long          lastClicks;
-@property (nonatomic,assign) NSTimeInterval lastCPSTime;
 @property (nonatomic,strong) AT10PassthroughWindow *overlayWindow;
 @end
 
@@ -166,6 +161,7 @@
     [_panel addSubview:_panelBody];
 
     int y = 10;
+
     _toggleBtn = [UIButton buttonWithType:UIButtonTypeCustom];
     _toggleBtn.frame = CGRectMake(10,y,190,38);
     _toggleBtn.layer.cornerRadius = 9;
@@ -178,9 +174,11 @@
     [_panelBody addSubview:_toggleBtn];
     y += 48;
 
+    // السرعة
     UILabel *spdTitle = [self lbl:@"السرعة" x:10 y:y w:100 bold:YES small:YES];
     spdTitle.textColor = [UIColor colorWithRed:0.48 green:0.70 blue:0.88 alpha:1];
     [_panelBody addSubview:spdTitle];
+
     _speedValLabel = [self lbl:@"أقصى سرعة" x:110 y:y w:90 bold:YES small:YES];
     _speedValLabel.textAlignment = NSTextAlignmentRight;
     _speedValLabel.textColor = BLUE_DARK;
@@ -196,29 +194,21 @@
           forControlEvents:UIControlEventValueChanged];
     [_panelBody addSubview:_speedSlider];
 
-    UILabel *slow = [self lbl:@"أبطأ" x:10 y:y+28 w:40 bold:NO small:YES];
+    // عكس الكلمتين
+    UILabel *slow = [self lbl:@"أسرع" x:10 y:y+28 w:40 bold:NO small:YES];
     slow.textColor = [UIColor colorWithRed:0.66 green:0.78 blue:0.93 alpha:1];
-    UILabel *fast = [self lbl:@"أسرع" x:160 y:y+28 w:40 bold:NO small:YES];
+    UILabel *fast = [self lbl:@"أبطأ" x:160 y:y+28 w:40 bold:NO small:YES];
     fast.textColor = slow.textColor;
     fast.textAlignment = NSTextAlignmentRight;
     [_panelBody addSubview:slow];
     [_panelBody addSubview:fast];
     y += 48;
 
-    UIView *row1 = [self makeStatRow:@"السرعة الفعلية:" val:@"—" x:10 y:y];
-    _cpsLabel = (UILabel *)[row1 viewWithTag:99];
-    [_panelBody addSubview:row1];
-    y += 26;
-
-    UIView *row2 = [self makeStatRow:@"النقرات:" val:@"0" x:10 y:y];
-    _cntLabel = (UILabel *)[row2 viewWithTag:99];
-    [_panelBody addSubview:row2];
-    y += 26;
-
+    // الحقوق — مربع أسود شفاف
     UILabel *cr = [self lbl:@"⌗ 10th | AsT7aLh | استحالة" x:10 y:y w:190 bold:NO small:YES];
     cr.textAlignment = NSTextAlignmentCenter;
-    cr.textColor = [UIColor colorWithRed:0.66 green:0.78 blue:0.93 alpha:1];
-    cr.backgroundColor = [UIColor colorWithRed:0.94 green:0.97 blue:1.0 alpha:1];
+    cr.textColor = [UIColor colorWithWhite:1 alpha:0.8];
+    cr.backgroundColor = [UIColor colorWithWhite:0 alpha:0.5];
     cr.layer.cornerRadius = 6;
     cr.layer.masksToBounds = YES;
     [_panelBody addSubview:cr];
@@ -226,26 +216,6 @@
 
     _panelBody.frame = CGRectMake(0,36,210,y+10);
     [self addSubview:_panel];
-}
-
-- (UIView *)makeStatRow:(NSString *)title val:(NSString *)val x:(int)x y:(int)y {
-    UIView *row = [[UIView alloc] initWithFrame:CGRectMake(x,y,190,22)];
-    row.backgroundColor = [UIColor colorWithRed:0.94 green:0.97 blue:1.0 alpha:1];
-    row.layer.cornerRadius = 6;
-    row.clipsToBounds = YES;
-    UILabel *tl = [[UILabel alloc] initWithFrame:CGRectMake(8,2,100,18)];
-    tl.text = title;
-    tl.font = [UIFont systemFontOfSize:9.5];
-    tl.textColor = BLUE_DARK;
-    [row addSubview:tl];
-    UILabel *vl = [[UILabel alloc] initWithFrame:CGRectMake(100,2,82,18)];
-    vl.text = val;
-    vl.font = [UIFont boldSystemFontOfSize:10];
-    vl.textColor = BLUE_DARK;
-    vl.textAlignment = NSTextAlignmentRight;
-    vl.tag = 99;
-    [row addSubview:vl];
-    return row;
 }
 
 - (void)setButtonBlue {
@@ -302,8 +272,6 @@
     if (!_running) {
         _running = YES;
         _accumulator = 0;
-        _lastClicks = _clicks;
-        _lastCPSTime = CACurrentMediaTime();
         _ticker = [CADisplayLink displayLinkWithTarget:self selector:@selector(tick:)];
         _ticker.preferredFramesPerSecond = 0;
         [_ticker addToRunLoop:NSRunLoop.mainRunLoop forMode:NSRunLoopCommonModes];
@@ -314,7 +282,6 @@
         [_ticker invalidate]; _ticker = nil;
         [self setButtonBlue];
         [_toggleBtn setTitle:@"▶  تفعيل" forState:UIControlStateNormal];
-        _cpsLabel.text = @"—";
     }
 }
 
@@ -333,24 +300,12 @@
             });
         });
     }
-    NSTimeInterval now = CACurrentMediaTime();
-    if (now - _lastCPSTime >= 1.0) {
-        long diff = _clicks - _lastClicks;
-        _lastClicks = _clicks;
-        _lastCPSTime = now;
-        dispatch_async(dispatch_get_main_queue(), ^{
-            self->_cpsLabel.text = [NSString stringWithFormat:@"%ld ن/ث", diff];
-            self->_cntLabel.text = [NSString stringWithFormat:@"%ld", self->_clicks];
-        });
-    }
 }
 
 - (void)showInView:(UIView *)parentView {
     UIWindowScene *scene = nil;
     for (UIScene *s in UIApplication.sharedApplication.connectedScenes) {
-        if ([s isKindOfClass:[UIWindowScene class]]) {
-            scene = (UIWindowScene *)s; break;
-        }
+        if ([s isKindOfClass:[UIWindowScene class]]) { scene = (UIWindowScene *)s; break; }
     }
     if (scene) {
         _overlayWindow = [[AT10PassthroughWindow alloc] initWithWindowScene:scene];
