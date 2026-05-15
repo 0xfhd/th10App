@@ -4,6 +4,7 @@
 #define BLUE_DARK  [UIColor colorWithRed:0.094 green:0.373 blue:0.647 alpha:1]
 #define BLUE_MID   [UIColor colorWithRed:0.216 green:0.541 blue:0.867 alpha:1]
 #define BLACK_BTN  [UIColor colorWithRed:0.07 green:0.07 blue:0.07 alpha:1]
+#define MAX_DOTS   10
 
 @interface AT10PassthroughWindow : UIWindow
 @end
@@ -15,19 +16,23 @@
 }
 @end
 
+@interface AT10Dot : UIView
+@property (nonatomic, assign) CGPoint dotPos;
+@end
+@implementation AT10Dot
+@end
+
 @interface AT10OverlayView()
-@property (nonatomic,strong) UIView        *dot;
-@property (nonatomic,strong) UILabel       *dotLabel;
+@property (nonatomic,strong) NSMutableArray<AT10Dot *> *dots;
 @property (nonatomic,strong) UIView        *panel;
 @property (nonatomic,strong) UIButton      *toggleBtn;
 @property (nonatomic,strong) UISlider      *speedSlider;
 @property (nonatomic,strong) UILabel       *speedValLabel;
 @property (nonatomic,strong) UIView        *panelBody;
 @property (nonatomic,strong) UIButton      *collapseBtn;
+@property (nonatomic,strong) UILabel       *dotCountLabel;
 @property (nonatomic,assign) BOOL          collapsed;
 @property (nonatomic,assign) BOOL          running;
-@property (nonatomic,assign) CGPoint       dotPos;
-@property (nonatomic,assign) long          clicks;
 @property (nonatomic,assign) NSInteger     cps;
 @property (nonatomic,strong) CADisplayLink *ticker;
 @property (nonatomic,assign) NSTimeInterval accumulator;
@@ -54,64 +59,66 @@
     if (self) {
         self.backgroundColor = UIColor.clearColor;
         self.userInteractionEnabled = YES;
-        _cps = 500;
+        _cps = 30;
         _collapsed = YES;
+        _dots = [NSMutableArray array];
         _credit = @"⌗ 10th | AsT7aLh | استحالة";
-        [self buildDot];
         [self buildPanel];
     }
     return self;
 }
 
-- (void)buildDot {
-    _dot = [[UIView alloc] initWithFrame:CGRectMake(0,0,46,46)];
-    _dot.backgroundColor = [UIColor colorWithWhite:1 alpha:0.15];
-    _dot.layer.cornerRadius = 23;
-    _dot.layer.borderWidth = 2;
-    _dot.layer.borderColor = [UIColor colorWithRed:0.216 green:0.541 blue:0.867 alpha:0.6].CGColor;
-    _dot.layer.masksToBounds = YES;
+#pragma mark - الدائرة
 
-    _dotLabel = [[UILabel alloc] initWithFrame:_dot.bounds];
-    _dotLabel.text = @"⌗ 10th";
-    _dotLabel.font = [UIFont boldSystemFontOfSize:7.5];
-    _dotLabel.textColor = UIColor.blackColor;
-    _dotLabel.textAlignment = NSTextAlignmentCenter;
-    _dotLabel.numberOfLines = 2;
-    [_dot addSubview:_dotLabel];
+- (AT10Dot *)makeDotAt:(CGPoint)center {
+    AT10Dot *dot = [[AT10Dot alloc] initWithFrame:CGRectMake(0,0,46,46)];
+    dot.backgroundColor = [UIColor colorWithWhite:1 alpha:0.15];
+    dot.layer.cornerRadius = 23;
+    dot.layer.borderWidth = 2;
+    dot.layer.borderColor = [UIColor colorWithRed:0.216 green:0.541 blue:0.867 alpha:0.6].CGColor;
+    dot.layer.masksToBounds = YES;
+    dot.dotPos = center;
+
+    UILabel *lbl = [[UILabel alloc] initWithFrame:dot.bounds];
+    lbl.text = @"⌗ 10th";
+    lbl.font = [UIFont boldSystemFontOfSize:7.5];
+    lbl.textColor = UIColor.blackColor;
+    lbl.textAlignment = NSTextAlignmentCenter;
+    lbl.numberOfLines = 2;
+    [dot addSubview:lbl];
 
     UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc]
         initWithTarget:self action:@selector(handleDotPan:)];
-    [_dot addGestureRecognizer:pan];
+    [dot addGestureRecognizer:pan];
 
     UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc]
         initWithTarget:self action:@selector(dotTapped)];
     tap.numberOfTapsRequired = 1;
-    [_dot addGestureRecognizer:tap];
+    [dot addGestureRecognizer:tap];
 
-    [self addSubview:_dot];
-}
-
-- (void)dotTapped {
-    _collapsed = !_collapsed;
-    [UIView animateWithDuration:0.25 animations:^{
-        self->_panelBody.alpha = self->_collapsed ? 0 : 1;
-        CGRect f = self->_panel.frame;
-        f.size.height = self->_collapsed ? 36 : 36 + self->_panelBody.bounds.size.height;
-        self->_panel.frame = f;
-        self->_panel.alpha = self->_collapsed ? 0 : 1;
-    }];
-    [_collapseBtn setTitle:_collapsed ? @"▼" : @"▲" forState:UIControlStateNormal];
+    dot.center = center;
+    [self addSubview:dot];
+    [_dots addObject:dot];
+    return dot;
 }
 
 - (void)handleDotPan:(UIPanGestureRecognizer *)g {
+    if (_running) return; // مقفل أثناء التشغيل
+    AT10Dot *dot = (AT10Dot *)g.view;
     CGPoint t = [g translationInView:self];
-    _dot.center = CGPointMake(
-        MAX(23, MIN(self.bounds.size.width-23,  _dot.center.x + t.x)),
-        MAX(23, MIN(self.bounds.size.height-23, _dot.center.y + t.y))
+    dot.center = CGPointMake(
+        MAX(23, MIN(self.bounds.size.width-23,  dot.center.x + t.x)),
+        MAX(23, MIN(self.bounds.size.height-23, dot.center.y + t.y))
     );
-    _dotPos = _dot.center;
+    dot.dotPos = dot.center;
     [g setTranslation:CGPointZero inView:self];
 }
+
+- (void)dotTapped {
+    [self toggleCollapse];
+}
+
+#pragma mark - القائمة
 
 - (void)buildPanel {
     _panel = [[UIView alloc] initWithFrame:CGRectMake(16,80,210,36)];
@@ -146,7 +153,7 @@
     _collapseBtn.layer.cornerRadius = 6;
     [_collapseBtn setTitle:@"▼" forState:UIControlStateNormal];
     _collapseBtn.titleLabel.font = [UIFont systemFontOfSize:11];
-    [_collapseBtn addTarget:self action:@selector(dotTapped)
+    [_collapseBtn addTarget:self action:@selector(toggleCollapse)
           forControlEvents:UIControlEventTouchUpInside];
     [hdr addSubview:_collapseBtn];
 
@@ -162,6 +169,7 @@
 
     int y = 10;
 
+    // زر التفعيل
     _toggleBtn = [UIButton buttonWithType:UIButtonTypeCustom];
     _toggleBtn.frame = CGRectMake(10,y,190,38);
     _toggleBtn.layer.cornerRadius = 9;
@@ -174,11 +182,12 @@
     [_panelBody addSubview:_toggleBtn];
     y += 48;
 
+    // السرعة
     UILabel *spdTitle = [self lbl:@"السرعة" x:10 y:y w:100 bold:YES small:YES];
     spdTitle.textColor = [UIColor colorWithWhite:1 alpha:0.7];
     [_panelBody addSubview:spdTitle];
 
-    _speedValLabel = [self lbl:@"أقصى سرعة" x:110 y:y w:90 bold:YES small:YES];
+    _speedValLabel = [self lbl:@"متوسط" x:110 y:y w:90 bold:YES small:YES];
     _speedValLabel.textAlignment = NSTextAlignmentRight;
     _speedValLabel.textColor = UIColor.whiteColor;
     [_panelBody addSubview:_speedValLabel];
@@ -186,8 +195,8 @@
 
     _speedSlider = [[UISlider alloc] initWithFrame:CGRectMake(10,y,190,28)];
     _speedSlider.minimumValue = 1;
-    _speedSlider.maximumValue = 500;
-    _speedSlider.value = 500;
+    _speedSlider.maximumValue = 60;
+    _speedSlider.value = 30;
     _speedSlider.tintColor = BLUE_MID;
     [_speedSlider addTarget:self action:@selector(speedChanged)
           forControlEvents:UIControlEventValueChanged];
@@ -202,6 +211,29 @@
     [_panelBody addSubview:fast];
     y += 48;
 
+    // زر إضافة دائرة
+    UIButton *addDot = [UIButton buttonWithType:UIButtonTypeCustom];
+    addDot.frame = CGRectMake(10,y,190,34);
+    addDot.layer.cornerRadius = 8;
+    addDot.backgroundColor = [UIColor colorWithWhite:1 alpha:0.12];
+    addDot.layer.borderWidth = 1;
+    addDot.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.2].CGColor;
+    addDot.titleLabel.font = [UIFont boldSystemFontOfSize:12];
+    [addDot setTitle:@"＋  إضافة دائرة" forState:UIControlStateNormal];
+    [addDot setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
+    [addDot addTarget:self action:@selector(addDotTapped)
+        forControlEvents:UIControlEventTouchUpInside];
+    [_panelBody addSubview:addDot];
+    y += 42;
+
+    // عداد الدوائر
+    _dotCountLabel = [self lbl:@"الدوائر: 0 / 10" x:10 y:y w:190 bold:NO small:YES];
+    _dotCountLabel.textAlignment = NSTextAlignmentCenter;
+    _dotCountLabel.textColor = [UIColor colorWithWhite:1 alpha:0.5];
+    [_panelBody addSubview:_dotCountLabel];
+    y += 22;
+
+    // الحقوق
     UILabel *cr = [self lbl:@"⌗ 10th | AsT7aLh | استحالة" x:10 y:y w:190 bold:NO small:YES];
     cr.textAlignment = NSTextAlignmentCenter;
     cr.textColor = [UIColor colorWithWhite:1 alpha:0.6];
@@ -215,6 +247,26 @@
     [self addSubview:_panel];
 }
 
+- (void)addDotTapped {
+    if (_dots.count >= MAX_DOTS) return;
+    CGPoint center = CGPointMake(self.bounds.size.width/2 + (_dots.count * 10),
+                                  self.bounds.size.height/2);
+    [self makeDotAt:center];
+    _dotCountLabel.text = [NSString stringWithFormat:@"الدوائر: %lu / 10", (unsigned long)_dots.count];
+}
+
+- (void)toggleCollapse {
+    _collapsed = !_collapsed;
+    [UIView animateWithDuration:0.25 animations:^{
+        self->_panelBody.alpha = self->_collapsed ? 0 : 1;
+        CGRect f = self->_panel.frame;
+        f.size.height = self->_collapsed ? 36 : 36 + self->_panelBody.bounds.size.height;
+        self->_panel.frame = f;
+        self->_panel.alpha = self->_collapsed ? 0 : 1;
+    }];
+    [_collapseBtn setTitle:_collapsed ? @"▼" : @"▲" forState:UIControlStateNormal];
+}
+
 - (void)setButtonBlue {
     for (CALayer *l in _toggleBtn.layer.sublayers)
         if ([l isKindOfClass:[CAGradientLayer class]]) { [l removeFromSuperlayer]; break; }
@@ -226,20 +278,12 @@
     g.endPoint   = CGPointMake(1,0.5);
     [_toggleBtn.layer insertSublayer:g atIndex:0];
     _toggleBtn.backgroundColor = UIColor.clearColor;
-    _toggleBtn.layer.shadowColor   = BLUE_DARK.CGColor;
-    _toggleBtn.layer.shadowOpacity = 0.30;
-    _toggleBtn.layer.shadowRadius  = 6;
-    _toggleBtn.layer.shadowOffset  = CGSizeMake(0,2);
 }
 
 - (void)setButtonBlack {
     for (CALayer *l in _toggleBtn.layer.sublayers)
         if ([l isKindOfClass:[CAGradientLayer class]]) { [l removeFromSuperlayer]; break; }
-    _toggleBtn.backgroundColor    = BLACK_BTN;
-    _toggleBtn.layer.shadowColor   = UIColor.blackColor.CGColor;
-    _toggleBtn.layer.shadowOpacity = 0.30;
-    _toggleBtn.layer.shadowRadius  = 6;
-    _toggleBtn.layer.shadowOffset  = CGSizeMake(0,2);
+    _toggleBtn.backgroundColor = BLACK_BTN;
 }
 
 - (UILabel *)lbl:(NSString *)t x:(int)x y:(int)y w:(int)w bold:(BOOL)b small:(BOOL)s {
@@ -253,7 +297,7 @@
 - (void)handlePanelPan:(UIPanGestureRecognizer *)g {
     CGPoint t = [g translationInView:self];
     _panel.center = CGPointMake(
-        MAX(_panel.bounds.size.width/2,  MIN(self.bounds.size.width - _panel.bounds.size.width/2,  _panel.center.x + t.x)),
+        MAX(_panel.bounds.size.width/2, MIN(self.bounds.size.width - _panel.bounds.size.width/2, _panel.center.x + t.x)),
         MAX(_panel.bounds.size.height/2, MIN(self.bounds.size.height - _panel.bounds.size.height/2, _panel.center.y + t.y))
     );
     [g setTranslation:CGPointZero inView:self];
@@ -262,11 +306,15 @@
 - (void)speedChanged {
     int v = (int)_speedSlider.value;
     _cps = v;
-    _speedValLabel.text = v >= 500 ? @"أقصى سرعة" : [NSString stringWithFormat:@"%d ن/ث", v];
+    if (v <= 10) _speedValLabel.text = @"بطيء";
+    else if (v <= 30) _speedValLabel.text = @"متوسط";
+    else if (v <= 50) _speedValLabel.text = @"سريع";
+    else _speedValLabel.text = @"أقصى سرعة";
 }
 
 - (void)toggleTapped {
     if (!_running) {
+        if (_dots.count == 0) return;
         _running = YES;
         _accumulator = 0;
         _ticker = [CADisplayLink displayLinkWithTarget:self selector:@selector(tick:)];
@@ -288,14 +336,15 @@
     double interval = 1.0 / MAX(1, _cps);
     while (_accumulator >= interval) {
         _accumulator -= interval;
-        _clicks++;
-        if (self.onTap) self.onTap(_dotPos);
-        dispatch_async(dispatch_get_main_queue(), ^{
-            self->_dot.backgroundColor = [UIColor colorWithRed:0.84 green:0.91 blue:0.97 alpha:0.4];
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 40*NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
-                self->_dot.backgroundColor = [UIColor colorWithWhite:1 alpha:0.15];
+        for (AT10Dot *dot in _dots) {
+            if (self.onTap) self.onTap(dot.dotPos);
+            dispatch_async(dispatch_get_main_queue(), ^{
+                dot.backgroundColor = [UIColor colorWithRed:0.84 green:0.91 blue:0.97 alpha:0.4];
+                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 40*NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
+                    dot.backgroundColor = [UIColor colorWithWhite:1 alpha:0.15];
+                });
             });
-        });
+        }
     }
 }
 
@@ -319,9 +368,12 @@
     _overlayWindow.hidden = NO;
 
     self.frame = _overlayWindow.bounds;
-    _dotPos = CGPointMake(60, 200);
-    _dot.center = _dotPos;
     _panel.frame = CGRectMake(16, 80, 210, 36);
+
+    // دائرة أولى تلقائياً
+    [self makeDotAt:CGPointMake(60, 300)];
+    _dotCountLabel.text = @"الدوائر: 1 / 10";
+
     [vc.view addSubview:self];
 }
 
@@ -332,8 +384,6 @@
     _overlayWindow = nil;
 }
 
-- (BOOL)isRunning      { return _running; }
-- (CGPoint)dotPosition { return _dotPos; }
-- (long)totalClicks    { return _clicks; }
+- (BOOL)isRunning { return _running; }
 
 @end
