@@ -1,40 +1,48 @@
 #import <UIKit/UIKit.h>
 #import "AT10OverlayView.h"
+#import <mach/mach_time.h>
 
-// IOHIDEvent للمس الحقيقي
 typedef struct __IOHIDEvent *IOHIDEventRef;
-extern IOHIDEventRef IOHIDEventCreateDigitizerFingerEvent(CFAllocatorRef, uint64_t, uint32_t, uint32_t, uint32_t, double, double, double, double, double, uint32_t, bool, bool, uint32_t);
-extern void UIApplicationSendEvent(UIApplication *, UIEvent *);
-extern IOHIDEventRef IOHIDEventCreateDigitizerEvent(CFAllocatorRef, uint64_t, uint32_t, uint32_t, uint32_t, double, double, double, double, double, uint32_t, double, double, uint32_t, bool, bool, uint32_t);
+
+extern IOHIDEventRef IOHIDEventCreateDigitizerFingerEvent(
+    CFAllocatorRef allocator,
+    uint64_t timeStamp,
+    uint32_t index,
+    uint32_t identity,
+    uint32_t eventMask,
+    double x, double y, double z,
+    double tipPressure, double twist,
+    uint32_t range, bool touch,
+    bool ignorance, uint32_t options
+);
+
+extern void IOHIDEventSetIntegerValue(IOHIDEventRef event, int field, int value);
+extern CFTypeRef UIApplicationSendEvent(UIApplication *app, IOHIDEventRef event);
 
 static void simulateTap(CGPoint point) {
-    UIWindow *win = nil;
-    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
-        if ([scene isKindOfClass:[UIWindowScene class]]) {
-            for (UIWindow *w in ((UIWindowScene *)scene).windows) {
-                if (!w.isHidden && w.windowLevel == UIWindowLevelNormal) {
-                    win = w; break;
-                }
-            }
-        }
+    CGSize screen = UIScreen.mainScreen.bounds.size;
+    double x = point.x / screen.width;
+    double y = point.y / screen.height;
+    uint64_t ts = mach_absolute_time();
+
+    IOHIDEventRef down = IOHIDEventCreateDigitizerFingerEvent(
+        kCFAllocatorDefault, ts, 0, 1, 0x3,
+        x, y, 0, 1.0, 0, 1, true, false, 0
+    );
+    IOHIDEventRef up = IOHIDEventCreateDigitizerFingerEvent(
+        kCFAllocatorDefault, ts + 1000000, 0, 1, 0x3,
+        x, y, 0, 0.0, 0, 0, false, false, 0
+    );
+
+    if (down) {
+        UIApplicationSendEvent(UIApplication.sharedApplication, down);
+        CFRelease(down);
     }
-    if (!win) return;
-
-    // محاكاة لمس عبر sendEvent
-    UITouch *touch = [[UITouch alloc] init];
-    [touch setValue:@(UITouchPhaseBegan) forKey:@"phase"];
-    [touch setValue:@(0.1) forKey:@"timestamp"];
-    [touch setValue:win forKey:@"window"];
-    [touch setValue:win forKey:@"view"];
-    [touch setValue:[NSValue valueWithCGPoint:point] forKey:@"locationInWindow"];
-
-    UIEvent *event = [[UIEvent alloc] init];
-    [event setValue:[NSSet setWithObject:touch] forKey:@"_touches"];
-    [win sendEvent:event];
-
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 10*NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
-        [touch setValue:@(UITouchPhaseEnded) forKey:@"phase"];
-        [win sendEvent:event];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 20*NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
+        if (up) {
+            UIApplicationSendEvent(UIApplication.sharedApplication, up);
+            CFRelease(up);
+        }
     });
 }
 
