@@ -1,6 +1,3 @@
-//  AT10OverlayView.m
-//  © AsT7aLh — All Rights Reserved — استحالة ⌗ 10th
-
 #import "AT10OverlayView.h"
 #import <QuartzCore/QuartzCore.h>
 
@@ -45,8 +42,12 @@
     if (self) {
         self.backgroundColor = UIColor.clearColor;
         self.userInteractionEnabled = YES;
+        self.multipleTouchEnabled = YES;
+        self.exclusiveTouch = NO;
+
         _cps = 120;
         _credit = @"⌗ 10th | AsT7aLh | استحالة";
+
         [self buildDot];
         [self buildPanel];
     }
@@ -356,12 +357,12 @@
 - (CGPoint)dotPosition { return _dotPos; }
 - (long)totalClicks    { return _clicks; }
 
-#pragma mark - إصلاح اللمسات
+#pragma mark - إصلاح اللمسات (الأهم)
 
 - (BOOL)pointInside:(CGPoint)point withEvent:(UIEvent *)event {
     if (CGRectContainsPoint(self.dot.frame, point))   return YES;
     if (CGRectContainsPoint(self.panel.frame, point)) return YES;
-    return NO;
+    return NO; // يسمح بتمرير اللمس للعبة
 }
 
 @end
