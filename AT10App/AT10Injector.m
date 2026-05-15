@@ -1,10 +1,8 @@
 #import <UIKit/UIKit.h>
 #import <dlfcn.h>
-#import <mach/mach_time.h>
 #import "AT10OverlayView.h"
 
 static void simulateTap(CGPoint point) {
-    // نجيب الـ window الأساسية للتطبيق (مو نافذتنا)
     UIWindow *targetWindow = nil;
     for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
         if ([scene isKindOfClass:[UIWindowScene class]]) {
@@ -18,30 +16,30 @@ static void simulateTap(CGPoint point) {
     }
     if (!targetWindow) return;
 
-    // نجيب الـ view اللي تحت نقطة الضغط
     UIView *targetView = [targetWindow hitTest:point withEvent:nil];
     if (!targetView) targetView = targetWindow;
 
-    // نرسل اللمس مباشرة للـ view
-    dispatch_async(dispatch_get_main_queue(), ^{
-        // began
-        NSSet *touches = [NSSet set];
-        UIEvent *event = [[UIEvent alloc] init];
+    SEL began = NSSelectorFromString(@"touchesBegan:withEvent:");
+    SEL ended = NSSelectorFromString(@"touchesEnded:withEvent:");
+    NSSet *empty = [NSSet set];
+    UIEvent *ev = [[UIEvent alloc] init];
 
-        // نستخدم performSelector عشان نتجنب private API في البناء
-        SEL touchesBegan = NSSelectorFromString(@"touchesBegan:withEvent:");
-        SEL touchesEnded = NSSelectorFromString(@"touchesEnded:withEvent:");
+    if ([targetView respondsToSelector:began])
+        [targetView performSelector:began withObject:empty withObject:ev];
 
-        if ([targetView respondsToSelector:touchesBegan]) {
-            [targetView performSelector:touchesBegan withObject:touches withObject:event];
-        }
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 30*NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
-            if ([targetView respondsToSelector:touchesEnded]) {
-                [targetView performSelector:touchesEnded withObject:touches withObject:event];
-            }
-        });
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 30*NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
+        if ([targetView respondsToSelector:ended])
+            [targetView performSelector:ended withObject:empty withObject:ev];
     });
 }
 
-__attribute__((constructor))
-static void AT10Aut
+static void autoStart(void);
+
+__attribute__((constructor)) static void autoStart(void) {
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)),
+        dispatch_get_main_queue(), ^{
+            AT10OverlayView *overlay = [AT10OverlayView sharedOverlay];
+            overlay.onTap = ^(CGPoint pos) { simulateTap(pos); };
+            [overlay showInView:nil];
+        });
+}
