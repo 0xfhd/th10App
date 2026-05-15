@@ -360,9 +360,21 @@
 #pragma mark - إصلاح اللمسات (الأهم)
 
 - (BOOL)pointInside:(CGPoint)point withEvent:(UIEvent *)event {
-    if (CGRectContainsPoint(self.dot.frame, point))   return YES;
-    if (CGRectContainsPoint(self.panel.frame, point)) return YES;
-    return NO; // يسمح بتمرير اللمس للعبة
-}
 
+    CGPoint p = [
+    [self convertPoint:point toView:self];
+
+    // لو اللمس على الدائرة
+    if (CGRectContainsPoint(self.dot.frame, p)) {
+        return YES;
+    }
+
+    // لو اللمس على اللوحة
+    if (CGRectContainsPoint(self.panel.frame, p)) {
+        return YES;
+    }
+
+    // أي مكان ثاني → مرر اللمس للعبة
+    return NO;
+}
 @end
