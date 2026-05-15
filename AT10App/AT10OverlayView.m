@@ -116,12 +116,12 @@
 - (void)buildPanel {
     _panel = [[UIView alloc] initWithFrame:CGRectMake(16,80,210,36)];
     _panel.alpha = 0;
-    _panel.backgroundColor = UIColor.whiteColor;
+    _panel.backgroundColor = [UIColor colorWithWhite:0 alpha:0.7];
     _panel.layer.cornerRadius = 14;
     _panel.layer.borderWidth  = 1.5;
-    _panel.layer.borderColor  = [UIColor colorWithRed:0.76 green:0.85 blue:0.97 alpha:1].CGColor;
-    _panel.layer.shadowColor  = BLUE_DARK.CGColor;
-    _panel.layer.shadowOpacity= 0.10;
+    _panel.layer.borderColor  = [UIColor colorWithWhite:1 alpha:0.15].CGColor;
+    _panel.layer.shadowColor  = UIColor.blackColor.CGColor;
+    _panel.layer.shadowOpacity= 0.3;
     _panel.layer.shadowRadius = 10;
     _panel.layer.shadowOffset = CGSizeMake(0,3);
     _panel.clipsToBounds = YES;
@@ -174,14 +174,13 @@
     [_panelBody addSubview:_toggleBtn];
     y += 48;
 
-    // السرعة
     UILabel *spdTitle = [self lbl:@"السرعة" x:10 y:y w:100 bold:YES small:YES];
-    spdTitle.textColor = [UIColor colorWithRed:0.48 green:0.70 blue:0.88 alpha:1];
+    spdTitle.textColor = [UIColor colorWithWhite:1 alpha:0.7];
     [_panelBody addSubview:spdTitle];
 
     _speedValLabel = [self lbl:@"أقصى سرعة" x:110 y:y w:90 bold:YES small:YES];
     _speedValLabel.textAlignment = NSTextAlignmentRight;
-    _speedValLabel.textColor = BLUE_DARK;
+    _speedValLabel.textColor = UIColor.whiteColor;
     [_panelBody addSubview:_speedValLabel];
     y += 18;
 
@@ -189,14 +188,13 @@
     _speedSlider.minimumValue = 1;
     _speedSlider.maximumValue = 500;
     _speedSlider.value = 500;
-    _speedSlider.tintColor = BLUE_DARK;
+    _speedSlider.tintColor = BLUE_MID;
     [_speedSlider addTarget:self action:@selector(speedChanged)
           forControlEvents:UIControlEventValueChanged];
     [_panelBody addSubview:_speedSlider];
 
-    // عكس الكلمتين
     UILabel *slow = [self lbl:@"أسرع" x:10 y:y+28 w:40 bold:NO small:YES];
-    slow.textColor = [UIColor colorWithRed:0.66 green:0.78 blue:0.93 alpha:1];
+    slow.textColor = [UIColor colorWithWhite:1 alpha:0.5];
     UILabel *fast = [self lbl:@"أبطأ" x:160 y:y+28 w:40 bold:NO small:YES];
     fast.textColor = slow.textColor;
     fast.textAlignment = NSTextAlignmentRight;
@@ -204,11 +202,10 @@
     [_panelBody addSubview:fast];
     y += 48;
 
-    // الحقوق — مربع أسود شفاف
     UILabel *cr = [self lbl:@"⌗ 10th | AsT7aLh | استحالة" x:10 y:y w:190 bold:NO small:YES];
     cr.textAlignment = NSTextAlignmentCenter;
-    cr.textColor = [UIColor colorWithWhite:1 alpha:0.8];
-    cr.backgroundColor = [UIColor colorWithWhite:0 alpha:0.5];
+    cr.textColor = [UIColor colorWithWhite:1 alpha:0.6];
+    cr.backgroundColor = [UIColor colorWithWhite:0 alpha:0.3];
     cr.layer.cornerRadius = 6;
     cr.layer.masksToBounds = YES;
     [_panelBody addSubview:cr];
@@ -248,7 +245,7 @@
 - (UILabel *)lbl:(NSString *)t x:(int)x y:(int)y w:(int)w bold:(BOOL)b small:(BOOL)s {
     UILabel *l = [[UILabel alloc] initWithFrame:CGRectMake(x,y,w,18)];
     l.text = t;
-    l.textColor = BLUE_DARK;
+    l.textColor = UIColor.whiteColor;
     l.font = b ? [UIFont boldSystemFontOfSize:s?9.5:11] : [UIFont systemFontOfSize:s?9:10];
     return l;
 }
