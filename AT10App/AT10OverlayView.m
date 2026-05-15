@@ -4,6 +4,7 @@
 #define BLUE_DARK  [UIColor colorWithRed:0.094 green:0.373 blue:0.647 alpha:1]
 #define BLUE_MID   [UIColor colorWithRed:0.216 green:0.541 blue:0.867 alpha:1]
 #define BLACK_BTN  [UIColor colorWithRed:0.07 green:0.07 blue:0.07 alpha:1]
+#define PW         170.0
 #define MAX_DOTS   10
 
 @interface AT10PassthroughWindow : UIWindow
@@ -68,20 +69,18 @@
     return self;
 }
 
-#pragma mark - الدائرة
-
 - (AT10Dot *)makeDotAt:(CGPoint)center {
-    AT10Dot *dot = [[AT10Dot alloc] initWithFrame:CGRectMake(0,0,46,46)];
+    AT10Dot *dot = [[AT10Dot alloc] initWithFrame:CGRectMake(0,0,44,44)];
     dot.backgroundColor = [UIColor colorWithWhite:1 alpha:0.15];
-    dot.layer.cornerRadius = 23;
-    dot.layer.borderWidth = 2;
+    dot.layer.cornerRadius = 22;
+    dot.layer.borderWidth = 1.8;
     dot.layer.borderColor = [UIColor colorWithRed:0.216 green:0.541 blue:0.867 alpha:0.6].CGColor;
     dot.layer.masksToBounds = YES;
     dot.dotPos = center;
 
     UILabel *lbl = [[UILabel alloc] initWithFrame:dot.bounds];
     lbl.text = @"⌗ 10th";
-    lbl.font = [UIFont boldSystemFontOfSize:7.5];
+    lbl.font = [UIFont boldSystemFontOfSize:7];
     lbl.textColor = UIColor.blackColor;
     lbl.textAlignment = NSTextAlignmentCenter;
     lbl.numberOfLines = 2;
@@ -103,12 +102,12 @@
 }
 
 - (void)handleDotPan:(UIPanGestureRecognizer *)g {
-    if (_running) return; // مقفل أثناء التشغيل
+    if (_running) return;
     AT10Dot *dot = (AT10Dot *)g.view;
     CGPoint t = [g translationInView:self];
     dot.center = CGPointMake(
-        MAX(23, MIN(self.bounds.size.width-23,  dot.center.x + t.x)),
-        MAX(23, MIN(self.bounds.size.height-23, dot.center.y + t.y))
+        MAX(22, MIN(self.bounds.size.width-22,  dot.center.x + t.x)),
+        MAX(22, MIN(self.bounds.size.height-22, dot.center.y + t.y))
     );
     dot.dotPos = dot.center;
     [g setTranslation:CGPointZero inView:self];
@@ -118,22 +117,17 @@
     [self toggleCollapse];
 }
 
-#pragma mark - القائمة
-
 - (void)buildPanel {
-    _panel = [[UIView alloc] initWithFrame:CGRectMake(16,80,210,36)];
+    _panel = [[UIView alloc] initWithFrame:CGRectMake(16,80,PW,30)];
     _panel.alpha = 0;
-    _panel.backgroundColor = [UIColor colorWithWhite:0 alpha:0.7];
-    _panel.layer.cornerRadius = 14;
-    _panel.layer.borderWidth  = 1.5;
-    _panel.layer.borderColor  = [UIColor colorWithWhite:1 alpha:0.15].CGColor;
-    _panel.layer.shadowColor  = UIColor.blackColor.CGColor;
-    _panel.layer.shadowOpacity= 0.3;
-    _panel.layer.shadowRadius = 10;
-    _panel.layer.shadowOffset = CGSizeMake(0,3);
+    _panel.backgroundColor = [UIColor colorWithWhite:0 alpha:0.72];
+    _panel.layer.cornerRadius = 12;
+    _panel.layer.borderWidth  = 1;
+    _panel.layer.borderColor  = [UIColor colorWithWhite:1 alpha:0.12].CGColor;
     _panel.clipsToBounds = YES;
 
-    UIView *hdr = [[UIView alloc] initWithFrame:CGRectMake(0,0,210,36)];
+    // هيدر
+    UIView *hdr = [[UIView alloc] initWithFrame:CGRectMake(0,0,PW,30)];
     CAGradientLayer *g = [CAGradientLayer layer];
     g.frame = hdr.bounds;
     g.colors = @[(id)BLUE_DARK.CGColor, (id)BLUE_MID.CGColor];
@@ -141,18 +135,18 @@
     g.endPoint   = CGPointMake(1,0.5);
     [hdr.layer addSublayer:g];
 
-    UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(10,0,155,36)];
+    UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(8,0,PW-36,30)];
     title.text = @"⌗ 10th — AsT7aLh";
-    title.font = [UIFont boldSystemFontOfSize:10.5];
+    title.font = [UIFont boldSystemFontOfSize:9.5];
     title.textColor = UIColor.whiteColor;
     [hdr addSubview:title];
 
     _collapseBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-    _collapseBtn.frame = CGRectMake(174,6,24,24);
+    _collapseBtn.frame = CGRectMake(PW-28,5,22,20);
     _collapseBtn.backgroundColor = [UIColor colorWithWhite:1 alpha:0.18];
-    _collapseBtn.layer.cornerRadius = 6;
+    _collapseBtn.layer.cornerRadius = 5;
     [_collapseBtn setTitle:@"▼" forState:UIControlStateNormal];
-    _collapseBtn.titleLabel.font = [UIFont systemFontOfSize:11];
+    _collapseBtn.titleLabel.font = [UIFont systemFontOfSize:9];
     [_collapseBtn addTarget:self action:@selector(toggleCollapse)
           forControlEvents:UIControlEventTouchUpInside];
     [hdr addSubview:_collapseBtn];
@@ -162,38 +156,44 @@
     [hdr addGestureRecognizer:panG];
     [_panel addSubview:hdr];
 
-    _panelBody = [[UIView alloc] initWithFrame:CGRectMake(0,36,210,240)];
+    // body
+    _panelBody = [[UIView alloc] initWithFrame:CGRectMake(0,30,PW,200)];
     _panelBody.backgroundColor = UIColor.clearColor;
     _panelBody.alpha = 0;
     [_panel addSubview:_panelBody];
 
-    int y = 10;
+    CGFloat W = PW - 16;
+    int y = 8;
 
     // زر التفعيل
     _toggleBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-    _toggleBtn.frame = CGRectMake(10,y,190,38);
-    _toggleBtn.layer.cornerRadius = 9;
-    _toggleBtn.titleLabel.font = [UIFont boldSystemFontOfSize:14];
+    _toggleBtn.frame = CGRectMake(8,y,W,32);
+    _toggleBtn.layer.cornerRadius = 8;
+    _toggleBtn.titleLabel.font = [UIFont boldSystemFontOfSize:12];
     [_toggleBtn setTitle:@"▶  تفعيل" forState:UIControlStateNormal];
     [_toggleBtn setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
     [self setButtonBlue];
     [_toggleBtn addTarget:self action:@selector(toggleTapped)
         forControlEvents:UIControlEventTouchUpInside];
     [_panelBody addSubview:_toggleBtn];
-    y += 48;
+    y += 38;
 
     // السرعة
-    UILabel *spdTitle = [self lbl:@"السرعة" x:10 y:y w:100 bold:YES small:YES];
-    spdTitle.textColor = [UIColor colorWithWhite:1 alpha:0.7];
+    UILabel *spdTitle = [[UILabel alloc] initWithFrame:CGRectMake(8,y,W/2,14)];
+    spdTitle.text = @"السرعة";
+    spdTitle.font = [UIFont boldSystemFontOfSize:8.5];
+    spdTitle.textColor = [UIColor colorWithWhite:1 alpha:0.6];
     [_panelBody addSubview:spdTitle];
 
-    _speedValLabel = [self lbl:@"متوسط" x:110 y:y w:90 bold:YES small:YES];
-    _speedValLabel.textAlignment = NSTextAlignmentRight;
+    _speedValLabel = [[UILabel alloc] initWithFrame:CGRectMake(8+W/2,y,W/2,14)];
+    _speedValLabel.text = @"متوسط";
+    _speedValLabel.font = [UIFont boldSystemFontOfSize:8.5];
     _speedValLabel.textColor = UIColor.whiteColor;
+    _speedValLabel.textAlignment = NSTextAlignmentRight;
     [_panelBody addSubview:_speedValLabel];
-    y += 18;
+    y += 16;
 
-    _speedSlider = [[UISlider alloc] initWithFrame:CGRectMake(10,y,190,28)];
+    _speedSlider = [[UISlider alloc] initWithFrame:CGRectMake(8,y,W,22)];
     _speedSlider.minimumValue = 1;
     _speedSlider.maximumValue = 60;
     _speedSlider.value = 30;
@@ -201,66 +201,86 @@
     [_speedSlider addTarget:self action:@selector(speedChanged)
           forControlEvents:UIControlEventValueChanged];
     [_panelBody addSubview:_speedSlider];
+    y += 22;
 
-    UILabel *slow = [self lbl:@"أسرع" x:10 y:y+28 w:40 bold:NO small:YES];
-    slow.textColor = [UIColor colorWithWhite:1 alpha:0.5];
-    UILabel *fast = [self lbl:@"أبطأ" x:160 y:y+28 w:40 bold:NO small:YES];
-    fast.textColor = slow.textColor;
-    fast.textAlignment = NSTextAlignmentRight;
-    [_panelBody addSubview:slow];
-    [_panelBody addSubview:fast];
-    y += 48;
+    UILabel *lSlow = [[UILabel alloc] initWithFrame:CGRectMake(8,y,W/2,12)];
+    lSlow.text = @"أسرع";
+    lSlow.font = [UIFont systemFontOfSize:7.5];
+    lSlow.textColor = [UIColor colorWithWhite:1 alpha:0.4];
+    [_panelBody addSubview:lSlow];
+
+    UILabel *lFast = [[UILabel alloc] initWithFrame:CGRectMake(8+W/2,y,W/2,12)];
+    lFast.text = @"أبطأ";
+    lFast.font = [UIFont systemFontOfSize:7.5];
+    lFast.textColor = lSlow.textColor;
+    lFast.textAlignment = NSTextAlignmentRight;
+    [_panelBody addSubview:lFast];
+    y += 16;
+
+    // فاصل
+    UIView *sep = [[UIView alloc] initWithFrame:CGRectMake(8,y,W,0.5)];
+    sep.backgroundColor = [UIColor colorWithWhite:1 alpha:0.1];
+    [_panelBody addSubview:sep];
+    y += 8;
 
     // زر إضافة دائرة
     UIButton *addDot = [UIButton buttonWithType:UIButtonTypeCustom];
-    addDot.frame = CGRectMake(10,y,190,34);
-    addDot.layer.cornerRadius = 8;
-    addDot.backgroundColor = [UIColor colorWithWhite:1 alpha:0.12];
-    addDot.layer.borderWidth = 1;
+    addDot.frame = CGRectMake(8,y,W,28);
+    addDot.layer.cornerRadius = 7;
+    addDot.backgroundColor = [UIColor colorWithWhite:1 alpha:0.1];
+    addDot.layer.borderWidth = 0.8;
     addDot.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.2].CGColor;
-    addDot.titleLabel.font = [UIFont boldSystemFontOfSize:12];
-    [addDot setTitle:@"＋  إضافة دائرة" forState:UIControlStateNormal];
+    addDot.titleLabel.font = [UIFont boldSystemFontOfSize:11];
+    [addDot setTitle:@"＋  دائرة جديدة" forState:UIControlStateNormal];
     [addDot setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
     [addDot addTarget:self action:@selector(addDotTapped)
         forControlEvents:UIControlEventTouchUpInside];
     [_panelBody addSubview:addDot];
-    y += 42;
+    y += 34;
 
     // عداد الدوائر
-    _dotCountLabel = [self lbl:@"الدوائر: 0 / 10" x:10 y:y w:190 bold:NO small:YES];
+    _dotCountLabel = [[UILabel alloc] initWithFrame:CGRectMake(8,y,W,12)];
+    _dotCountLabel.text = @"الدوائر: 1 / 10";
+    _dotCountLabel.font = [UIFont systemFontOfSize:7.5];
+    _dotCountLabel.textColor = [UIColor colorWithWhite:1 alpha:0.4];
     _dotCountLabel.textAlignment = NSTextAlignmentCenter;
-    _dotCountLabel.textColor = [UIColor colorWithWhite:1 alpha:0.5];
     [_panelBody addSubview:_dotCountLabel];
-    y += 22;
+    y += 16;
+
+    // فاصل
+    UIView *sep2 = [[UIView alloc] initWithFrame:CGRectMake(8,y,W,0.5)];
+    sep2.backgroundColor = [UIColor colorWithWhite:1 alpha:0.1];
+    [_panelBody addSubview:sep2];
+    y += 8;
 
     // الحقوق
-    UILabel *cr = [self lbl:@"⌗ 10th | AsT7aLh | استحالة" x:10 y:y w:190 bold:NO small:YES];
+    UILabel *cr = [[UILabel alloc] initWithFrame:CGRectMake(8,y,W,12)];
+    cr.text = @"⌗ 10th | AsT7aLh | استحالة";
+    cr.font = [UIFont systemFontOfSize:7];
+    cr.textColor = [UIColor colorWithWhite:1 alpha:0.35];
     cr.textAlignment = NSTextAlignmentCenter;
-    cr.textColor = [UIColor colorWithWhite:1 alpha:0.6];
-    cr.backgroundColor = [UIColor colorWithWhite:0 alpha:0.3];
-    cr.layer.cornerRadius = 6;
-    cr.layer.masksToBounds = YES;
     [_panelBody addSubview:cr];
-    y += 22;
+    y += 16;
 
-    _panelBody.frame = CGRectMake(0,36,210,y+10);
+    _panelBody.frame = CGRectMake(0,30,PW,y+6);
     [self addSubview:_panel];
 }
 
 - (void)addDotTapped {
     if (_dots.count >= MAX_DOTS) return;
-    CGPoint center = CGPointMake(self.bounds.size.width/2 + (_dots.count * 10),
-                                  self.bounds.size.height/2);
-    [self makeDotAt:center];
-    _dotCountLabel.text = [NSString stringWithFormat:@"الدوائر: %lu / 10", (unsigned long)_dots.count];
+    CGPoint c = CGPointMake(self.bounds.size.width/2 + (_dots.count * 15),
+                             self.bounds.size.height/2);
+    [self makeDotAt:c];
+    _dotCountLabel.text = [NSString stringWithFormat:@"الدوائر: %lu / 10",
+                           (unsigned long)_dots.count];
 }
 
 - (void)toggleCollapse {
     _collapsed = !_collapsed;
-    [UIView animateWithDuration:0.25 animations:^{
+    [UIView animateWithDuration:0.2 animations:^{
         self->_panelBody.alpha = self->_collapsed ? 0 : 1;
         CGRect f = self->_panel.frame;
-        f.size.height = self->_collapsed ? 36 : 36 + self->_panelBody.bounds.size.height;
+        f.size.height = self->_collapsed ? 30 : 30 + self->_panelBody.bounds.size.height;
         self->_panel.frame = f;
         self->_panel.alpha = self->_collapsed ? 0 : 1;
     }];
@@ -272,7 +292,7 @@
         if ([l isKindOfClass:[CAGradientLayer class]]) { [l removeFromSuperlayer]; break; }
     CAGradientLayer *g = [CAGradientLayer layer];
     g.frame = _toggleBtn.bounds;
-    g.cornerRadius = 9;
+    g.cornerRadius = 8;
     g.colors = @[(id)BLUE_DARK.CGColor, (id)BLUE_MID.CGColor];
     g.startPoint = CGPointMake(0,0.5);
     g.endPoint   = CGPointMake(1,0.5);
@@ -284,14 +304,6 @@
     for (CALayer *l in _toggleBtn.layer.sublayers)
         if ([l isKindOfClass:[CAGradientLayer class]]) { [l removeFromSuperlayer]; break; }
     _toggleBtn.backgroundColor = BLACK_BTN;
-}
-
-- (UILabel *)lbl:(NSString *)t x:(int)x y:(int)y w:(int)w bold:(BOOL)b small:(BOOL)s {
-    UILabel *l = [[UILabel alloc] initWithFrame:CGRectMake(x,y,w,18)];
-    l.text = t;
-    l.textColor = UIColor.whiteColor;
-    l.font = b ? [UIFont boldSystemFontOfSize:s?9.5:11] : [UIFont systemFontOfSize:s?9:10];
-    return l;
 }
 
 - (void)handlePanelPan:(UIPanGestureRecognizer *)g {
@@ -306,8 +318,8 @@
 - (void)speedChanged {
     int v = (int)_speedSlider.value;
     _cps = v;
-    if (v <= 10) _speedValLabel.text = @"بطيء";
-    else if (v <= 30) _speedValLabel.text = @"متوسط";
+    if (v <= 15) _speedValLabel.text = @"بطيء";
+    else if (v <= 35) _speedValLabel.text = @"متوسط";
     else if (v <= 50) _speedValLabel.text = @"سريع";
     else _speedValLabel.text = @"أقصى سرعة";
 }
@@ -368,9 +380,8 @@
     _overlayWindow.hidden = NO;
 
     self.frame = _overlayWindow.bounds;
-    _panel.frame = CGRectMake(16, 80, 210, 36);
+    _panel.frame = CGRectMake(16, 80, PW, 30);
 
-    // دائرة أولى تلقائياً
     [self makeDotAt:CGPointMake(60, 300)];
     _dotCountLabel.text = @"الدوائر: 1 / 10";
 
