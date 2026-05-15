@@ -19,17 +19,17 @@
     self = [super initWithFrame:frame];
     if (self) {
 
-        // أهم شيء: الأوفرلاي نفسه ما يستقبل لمس
-        self.userInteractionEnabled = NO;
-        self.exclusiveTouch = NO;
-        self.multipleTouchEnabled = YES;
+        // الأوفرلاي نفسه شفاف ويستقبل لمس فقط عشان نتحكم فيه
         self.backgroundColor = UIColor.clearColor;
+        self.userInteractionEnabled = YES;
+        self.multipleTouchEnabled = YES;
+        self.exclusiveTouch = NO;
 
-        // الدائرة فقط هي اللي تستقبل لمس
+        // الدائرة اللي نبيها تتفاعل
         self.circleView = [[UIView alloc] initWithFrame:CGRectMake(150, 300, 80, 80)];
         self.circleView.backgroundColor = [[UIColor redColor] colorWithAlphaComponent:0.5];
         self.circleView.layer.cornerRadius = 40;
-        self.circleView.userInteractionEnabled = YES; // الدائرة فقط
+        self.circleView.userInteractionEnabled = YES;
         [self addSubview:self.circleView];
 
         // سحب الدائرة
@@ -39,7 +39,6 @@
     return self;
 }
 
-// الدائرة تتحرك فقط
 - (void)dragCircle:(UIPanGestureRecognizer *)gesture {
     CGPoint translation = [gesture translationInView:self];
     gesture.view.center = CGPointMake(gesture.view.center.x + translation.x,
@@ -47,15 +46,30 @@
     [gesture setTranslation:CGPointZero inView:self];
 }
 
-// أهم شيء: الأوفرلاي لا يستقبل لمس إلا على الدائرة فقط
-- (BOOL)pointInside:(CGPoint)point withEvent:(UIEvent *)event {
-    // إذا اللمس داخل الدائرة → استقبل اللمس
-    if (CGRectContainsPoint(self.circleView.frame, point)) {
-        return YES;
+// هنا السحر الحقيقي
+// نسمح باللمس فقط على الدائرة، والباقي يروح للعبة
+- (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
+
+    // لو الأوفرلاي مخفي أو شفاف جدًا → لا شيء
+    if (self.hidden || self.alpha < 0.01 || !self.userInteractionEnabled) {
+        return [super hitTest:point withEvent:event];
     }
-    // غير كذا → مرّر اللمس للعبة
-    return NO;
+
+    // نحول النقطة لإحداثيات الدائرة
+    CGPoint pointInCircle = [self convertPoint:point toView:self.circleView];
+
+    // إذا اللمس داخل الدائرة → رجّع الدائرة (تستقبل اللمس)
+    if ([self.circleView pointInside:pointInCircle withEvent:event]) {
+        return self.circleView;
+    }
+
+    // غير كذا → رجّع nil عشان اللمس يروح للعبة تحت
+    return nil;
+}
+
+// نخلي pointInside يرجع YES عشان hitTest يشتغل
+- (BOOL)pointInside:(CGPoint)point withEvent:(UIEvent *)event {
+    return YES;
 }
 
 @end
-

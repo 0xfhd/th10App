@@ -1,10 +1,7 @@
- // trigger rebuild
+// trigger rebuild
 
 #import <UIKit/UIKit.h>
 #import "AT10OverlayView.h"
-#import "AT10OverlayWindow.h"
-
-static AT10OverlayWindow *overlayWindow;
 
 __attribute__((constructor))
 static void AT10Start(void) {
@@ -12,17 +9,35 @@ static void AT10Start(void) {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
 
-        // نصنع نافذة خاصة للأوفرلاي
-        overlayWindow = [[AT10OverlayWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
-        overlayWindow.windowLevel = UIWindowLevelAlert + 5000;
-        overlayWindow.backgroundColor = UIColor.clearColor;
-        overlayWindow.hidden = NO;
+        UIWindow *targetWindow = nil;
 
-        // نضيف overlay داخل النافذة الخاصة
+        // نحاول نجيب نافذة اللعبة الأساسية
+        for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+            if ([scene isKindOfClass:[UIWindowScene class]]) {
+                UIWindowScene *ws = (UIWindowScene *)scene;
+
+                for (UIWindow *w in ws.windows) {
+                    if (w.isKeyWindow) {
+                        targetWindow = w;
+                        break;
+                    }
+                }
+            }
+            if (targetWindow) break;
+        }
+
+        // احتياط
+        if (!targetWindow)
+            targetWindow = UIApplication.sharedApplication.keyWindow;
+
+        if (!targetWindow)
+            return;
+
         AT10OverlayView *overlay = [AT10OverlayView sharedOverlay];
-        overlay.frame = overlayWindow.bounds;
+        overlay.frame = targetWindow.bounds;
 
-        [overlayWindow addSubview:overlay];
-        [overlayWindow bringSubviewToFront:overlay];
+        // نخليه فوق كل شيء في نفس النافذة
+        [targetWindow addSubview:overlay];
+        [targetWindow bringSubviewToFront:overlay];
     });
 }
