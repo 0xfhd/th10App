@@ -3,56 +3,45 @@
 #import <mach/mach_time.h>
 #import "AT10OverlayView.h"
 
-typedef struct __IOHIDEvent *IOHIDEventRef;
-
-typedef IOHIDEventRef (*IOHIDEventCreateDigitizerFingerEventFunc)(
-    CFAllocatorRef, uint64_t, uint32_t, uint32_t, uint32_t,
-    double, double, double, double, double,
-    uint32_t, bool, bool, uint32_t
-);
-
-typedef void (*UIApplicationSendEventFunc)(UIApplication *, IOHIDEventRef);
-
 static void simulateTap(CGPoint point) {
-    void *handle = dlopen("/System/Library/PrivateFrameworks/BackBoardServices.framework/BackBoardServices", RTLD_LAZY);
-    if (!handle) return;
+    // نجيب الـ window الأساسية للتطبيق (مو نافذتنا)
+    UIWindow *targetWindow = nil;
+    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+        if ([scene isKindOfClass:[UIWindowScene class]]) {
+            for (UIWindow *w in ((UIWindowScene *)scene).windows) {
+                if (!w.isHidden && w.windowLevel == UIWindowLevelNormal) {
+                    targetWindow = w;
+                    break;
+                }
+            }
+        }
+    }
+    if (!targetWindow) return;
 
-    IOHIDEventCreateDigitizerFingerEventFunc createEvent =
-        (IOHIDEventCreateDigitizerFingerEventFunc)dlsym(handle, "IOHIDEventCreateDigitizerFingerEvent");
+    // نجيب الـ view اللي تحت نقطة الضغط
+    UIView *targetView = [targetWindow hitTest:point withEvent:nil];
+    if (!targetView) targetView = targetWindow;
 
-    UIApplicationSendEventFunc sendEvent =
-        (UIApplicationSendEventFunc)dlsym(RTLD_DEFAULT, "UIApplicationSendEvent");
+    // نرسل اللمس مباشرة للـ view
+    dispatch_async(dispatch_get_main_queue(), ^{
+        // began
+        NSSet *touches = [NSSet set];
+        UIEvent *event = [[UIEvent alloc] init];
 
-    if (!createEvent || !sendEvent) { dlclose(handle); return; }
+        // نستخدم performSelector عشان نتجنب private API في البناء
+        SEL touchesBegan = NSSelectorFromString(@"touchesBegan:withEvent:");
+        SEL touchesEnded = NSSelectorFromString(@"touchesEnded:withEvent:");
 
-    CGSize screen = UIScreen.mainScreen.bounds.size;
-    double x = point.x / screen.width;
-    double y = point.y / screen.height;
-    uint64_t ts = mach_absolute_time();
-
-    IOHIDEventRef down = createEvent(kCFAllocatorDefault, ts, 0, 1, 0x3, x, y, 0, 1.0, 0, 1, true, false, 0);
-    IOHIDEventRef up   = createEvent(kCFAllocatorDefault, ts + 1000000, 0, 1, 0x3, x, y, 0, 0.0, 0, 0, false, false, 0);
-
-    if (down) { sendEvent(UIApplication.sharedApplication, down); CFRelease(down); }
-
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 20*NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
-        if (up) { sendEvent(UIApplication.sharedApplication, up); CFRelease(up); }
+        if ([targetView respondsToSelector:touchesBegan]) {
+            [targetView performSelector:touchesBegan withObject:touches withObject:event];
+        }
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 30*NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
+            if ([targetView respondsToSelector:touchesEnded]) {
+                [targetView performSelector:touchesEnded withObject:touches withObject:event];
+            }
+        });
     });
-
-    dlclose(handle);
 }
 
 __attribute__((constructor))
-static void AT10AutoStart(void) {
-    dispatch_after(
-        dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)),
-        dispatch_get_main_queue(),
-        ^{
-            AT10OverlayView *overlay = [AT10OverlayView sharedOverlay];
-            overlay.onTap = ^(CGPoint position) {
-                simulateTap(position);
-            };
-            [overlay showInView:nil];
-        }
-    );
-}
+static void AT10Aut
