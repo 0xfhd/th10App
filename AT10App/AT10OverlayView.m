@@ -15,10 +15,19 @@
     if (hit == self || hit == self.rootViewController.view) return nil;
     return hit;
 }
+- (BOOL)pointInside:(CGPoint)p withEvent:(UIEvent *)e {
+    for (UIView *v in self.rootViewController.view.subviews) {
+        if (!v.hidden && [v pointInside:[self convertPoint:p toView:v] withEvent:e])
+            return YES;
+    }
+    return NO;
+}
 @end
 
 @interface AT10Dot : UIView
 @property (nonatomic, assign) CGPoint dotPos;
+@property (nonatomic, assign) NSUInteger dotIndex;
+@property (nonatomic, assign) NSTimeInterval accumulator;
 @end
 @implementation AT10Dot
 @end
@@ -36,7 +45,6 @@
 @property (nonatomic,assign) BOOL          running;
 @property (nonatomic,assign) NSInteger     cps;
 @property (nonatomic,strong) CADisplayLink *ticker;
-@property (nonatomic,assign) NSTimeInterval accumulator;
 @property (nonatomic,strong) AT10PassthroughWindow *overlayWindow;
 @end
 
@@ -69,7 +77,7 @@
     return self;
 }
 
-- (AT10Dot *)makeDotAt:(CGPoint)center {
+- (AT10Dot *)makeDotAt:(CGPoint)center index:(NSUInteger)index {
     AT10Dot *dot = [[AT10Dot alloc] initWithFrame:CGRectMake(0,0,44,44)];
     dot.backgroundColor = [UIColor colorWithWhite:1 alpha:0.15];
     dot.layer.cornerRadius = 22;
@@ -77,9 +85,11 @@
     dot.layer.borderColor = [UIColor colorWithRed:0.216 green:0.541 blue:0.867 alpha:0.6].CGColor;
     dot.layer.masksToBounds = YES;
     dot.dotPos = center;
+    dot.dotIndex = index;
+    dot.accumulator = 0;
 
     UILabel *lbl = [[UILabel alloc] initWithFrame:dot.bounds];
-    lbl.text = @"⌗ 10th";
+    lbl.text = [NSString stringWithFormat:@"⌗ %lu", (unsigned long)(index+1)];
     lbl.font = [UIFont boldSystemFontOfSize:7];
     lbl.textColor = UIColor.blackColor;
     lbl.textAlignment = NSTextAlignmentCenter;
@@ -126,7 +136,6 @@
     _panel.layer.borderColor  = [UIColor colorWithWhite:1 alpha:0.12].CGColor;
     _panel.clipsToBounds = YES;
 
-    // هيدر
     UIView *hdr = [[UIView alloc] initWithFrame:CGRectMake(0,0,PW,30)];
     CAGradientLayer *g = [CAGradientLayer layer];
     g.frame = hdr.bounds;
@@ -156,7 +165,6 @@
     [hdr addGestureRecognizer:panG];
     [_panel addSubview:hdr];
 
-    // body
     _panelBody = [[UIView alloc] initWithFrame:CGRectMake(0,30,PW,200)];
     _panelBody.backgroundColor = UIColor.clearColor;
     _panelBody.alpha = 0;
@@ -165,7 +173,6 @@
     CGFloat W = PW - 16;
     int y = 8;
 
-    // زر التفعيل
     _toggleBtn = [UIButton buttonWithType:UIButtonTypeCustom];
     _toggleBtn.frame = CGRectMake(8,y,W,32);
     _toggleBtn.layer.cornerRadius = 8;
@@ -178,7 +185,6 @@
     [_panelBody addSubview:_toggleBtn];
     y += 38;
 
-    // السرعة
     UILabel *spdTitle = [[UILabel alloc] initWithFrame:CGRectMake(8,y,W/2,14)];
     spdTitle.text = @"السرعة";
     spdTitle.font = [UIFont boldSystemFontOfSize:8.5];
@@ -217,13 +223,11 @@
     [_panelBody addSubview:lFast];
     y += 16;
 
-    // فاصل
     UIView *sep = [[UIView alloc] initWithFrame:CGRectMake(8,y,W,0.5)];
     sep.backgroundColor = [UIColor colorWithWhite:1 alpha:0.1];
     [_panelBody addSubview:sep];
     y += 8;
 
-    // زر إضافة دائرة
     UIButton *addDot = [UIButton buttonWithType:UIButtonTypeCustom];
     addDot.frame = CGRectMake(8,y,W,28);
     addDot.layer.cornerRadius = 7;
@@ -238,7 +242,6 @@
     [_panelBody addSubview:addDot];
     y += 34;
 
-    // عداد الدوائر
     _dotCountLabel = [[UILabel alloc] initWithFrame:CGRectMake(8,y,W,12)];
     _dotCountLabel.text = @"الدوائر: 1 / 10";
     _dotCountLabel.font = [UIFont systemFontOfSize:7.5];
@@ -247,13 +250,11 @@
     [_panelBody addSubview:_dotCountLabel];
     y += 16;
 
-    // فاصل
     UIView *sep2 = [[UIView alloc] initWithFrame:CGRectMake(8,y,W,0.5)];
     sep2.backgroundColor = [UIColor colorWithWhite:1 alpha:0.1];
     [_panelBody addSubview:sep2];
     y += 8;
 
-    // الحقوق
     UILabel *cr = [[UILabel alloc] initWithFrame:CGRectMake(8,y,W,12)];
     cr.text = @"⌗ 10th | AsT7aLh | استحالة";
     cr.font = [UIFont systemFontOfSize:7];
@@ -270,7 +271,7 @@
     if (_dots.count >= MAX_DOTS) return;
     CGPoint c = CGPointMake(self.bounds.size.width/2 + (_dots.count * 15),
                              self.bounds.size.height/2);
-    [self makeDotAt:c];
+    [self makeDotAt:c index:_dots.count];
     _dotCountLabel.text = [NSString stringWithFormat:@"الدوائر: %lu / 10",
                            (unsigned long)_dots.count];
 }
@@ -328,7 +329,8 @@
     if (!_running) {
         if (_dots.count == 0) return;
         _running = YES;
-        _accumulator = 0;
+        // نصفر كل accumulator
+        for (AT10Dot *dot in _dots) dot.accumulator = 0;
         _ticker = [CADisplayLink displayLinkWithTarget:self selector:@selector(tick:)];
         _ticker.preferredFramesPerSecond = 0;
         [_ticker addToRunLoop:NSRunLoop.mainRunLoop forMode:NSRunLoopCommonModes];
@@ -344,11 +346,19 @@
 
 - (void)tick:(CADisplayLink *)dl {
     if (!_running) return;
-    _accumulator += dl.duration;
-    double interval = 1.0 / MAX(1, _cps);
-    while (_accumulator >= interval) {
-        _accumulator -= interval;
-        for (AT10Dot *dot in _dots) {
+
+    NSUInteger count = _dots.count;
+    for (NSUInteger i = 0; i < count; i++) {
+        AT10Dot *dot = _dots[i];
+
+        // الدائرة الأولى أسرع — كل دائرة تالية أبطأ 15%
+        double factor = pow(0.85, i);
+        double interval = 1.0 / MAX(1, _cps * factor);
+
+        dot.accumulator += dl.duration;
+
+        if (dot.accumulator >= interval) {
+            dot.accumulator -= interval;
             if (self.onTap) self.onTap(dot.dotPos);
             dispatch_async(dispatch_get_main_queue(), ^{
                 dot.backgroundColor = [UIColor colorWithRed:0.84 green:0.91 blue:0.97 alpha:0.4];
@@ -382,7 +392,7 @@
     self.frame = _overlayWindow.bounds;
     _panel.frame = CGRectMake(16, 80, PW, 30);
 
-    [self makeDotAt:CGPointMake(60, 300)];
+    [self makeDotAt:CGPointMake(60, 300) index:0];
     _dotCountLabel.text = @"الدوائر: 1 / 10";
 
     [vc.view addSubview:self];
