@@ -7,7 +7,6 @@
 #define APPROVED_KEY  @"bat_v1_approved"
 #define CODE_KEY      @"bat_v1_code"
 
-// نولد كود فريد للجهاز — مشفر ومو تسلسلي
 static NSString *getDeviceCode(void) {
     NSString *saved = [[NSUserDefaults standardUserDefaults] stringForKey:CODE_KEY];
     if (saved && saved.length > 0) return saved;
@@ -20,7 +19,6 @@ static NSString *getDeviceCode(void) {
     unsigned char r[CC_MD5_DIGEST_LENGTH];
     CC_MD5(c, (CC_LONG)strlen(c), r);
 
-    // شكل جميل XXXX-XXXX-XXXX
     NSString *code = [NSString stringWithFormat:@"%02X%02X-%02X%02X-%02X%02X",
         r[0],r[1],r[2],r[3],r[4],r[5]];
 
@@ -36,11 +34,11 @@ static void sendToBot(NSString *code) {
             @"━━━━━━━━━━━━━━\n"
             @"⌗ AsT7aLh\n\n"
             @"الكود:\n"
-            @"`%@`\n\n"
+            @"%@\n\n"
             @"للموافقة أرسل الكود هنا", code];
 
         NSString *url = [NSString stringWithFormat:
-            @"https://api.telegram.org/bot%@/sendMessage?chat_id=%@&text=%@&parse_mode=Markdown",
+            @"https://api.telegram.org/bot%@/sendMessage?chat_id=%@&text=%@",
             BOT_TOKEN, OWNER_CHAT_ID,
             [msg stringByAddingPercentEncodingWithAllowedCharacters:
                 [NSCharacterSet URLQueryAllowedCharacterSet]]];
@@ -65,12 +63,11 @@ static BOOL checkApproved(NSString *code) {
     return NO;
 }
 
-// ===== الواجهة =====
 @interface BatAuthView : UIView
 @property (nonatomic, strong) NSString *code;
 @property (nonatomic, strong) UILabel  *statusLbl;
 @property (nonatomic, strong) UIButton *checkBtn;
-@property (nonatomic, strong) UIButton *copyBtn2;
+@property (nonatomic, strong) UIButton *clipBtn;
 @property (nonatomic, weak)   UIWindow *win;
 @end
 
@@ -89,7 +86,6 @@ static BOOL checkApproved(NSString *code) {
 }
 
 - (void)setupBackground {
-    // خلفية متدرجة داكنة
     CAGradientLayer *bg = [CAGradientLayer layer];
     bg.frame = self.bounds;
     bg.colors = @[
@@ -101,7 +97,6 @@ static BOOL checkApproved(NSString *code) {
     bg.endPoint   = CGPointMake(1,1);
     [self.layer addSublayer:bg];
 
-    // جزيئات متحركة
     CAEmitterLayer *emitter = [CAEmitterLayer layer];
     emitter.frame = self.bounds;
     emitter.emitterPosition = CGPointMake(self.bounds.size.width/2, -10);
@@ -145,7 +140,6 @@ static BOOL checkApproved(NSString *code) {
     circle.layer.shadowOffset = CGSizeZero;
     [self addSubview:circle];
 
-    // تأثير نبض على الدائرة
     CABasicAnimation *pulse = [CABasicAnimation animationWithKeyPath:@"transform.scale"];
     pulse.fromValue = @(1.0);
     pulse.toValue   = @(1.08);
@@ -170,9 +164,7 @@ static BOOL checkApproved(NSString *code) {
     name.textAlignment = NSTextAlignmentCenter;
     name.alpha = 0;
     [self addSubview:name];
-    [UIView animateWithDuration:1.0 delay:0.4 options:0 animations:^{
-        name.alpha = 1;
-    } completion:nil];
+    [UIView animateWithDuration:1.0 delay:0.4 options:0 animations:^{ name.alpha = 1; } completion:nil];
 
     // خط فاصل
     UIView *line = [[UIView alloc] initWithFrame:CGRectMake(W*0.25, H*0.35, W*0.5, 0.5)];
@@ -208,14 +200,14 @@ static BOOL checkApproved(NSString *code) {
     codeLbl.adjustsFontSizeToFitWidth = YES;
     [box addSubview:codeLbl];
 
-    _copyBtn2 = [UIButton buttonWithType:UIButtonTypeCustom];
-    _copyBtn2.frame = CGRectMake(W-100, 14, 72, 30);
-    _copyBtn2.backgroundColor = [UIColor colorWithRed:0.094 green:0.373 blue:0.647 alpha:0.8];
-    _copyBtn2.layer.cornerRadius = 8;
-    [_copyBtn2 setTitle:@"نسخ" forState:UIControlStateNormal];
-    _copyBtn2.titleLabel.font = [UIFont boldSystemFontOfSize:13];
-    [_copyBtn2 addTarget:self action:@selector(doCopy) forControlEvents:UIControlEventTouchUpInside];
-    [box addSubview:_copyBtn2];
+    _clipBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+    _clipBtn.frame = CGRectMake(W-100, 14, 72, 30);
+    _clipBtn.backgroundColor = [UIColor colorWithRed:0.094 green:0.373 blue:0.647 alpha:0.8];
+    _clipBtn.layer.cornerRadius = 8;
+    [_clipBtn setTitle:@"نسخ" forState:UIControlStateNormal];
+    _clipBtn.titleLabel.font = [UIFont boldSystemFontOfSize:13];
+    [_clipBtn addTarget:self action:@selector(doClip) forControlEvents:UIControlEventTouchUpInside];
+    [box addSubview:_clipBtn];
 
     // زر تحقق
     _checkBtn = [UIButton buttonWithType:UIButtonTypeCustom];
@@ -260,13 +252,13 @@ static BOOL checkApproved(NSString *code) {
     [self addSubview:cr];
 }
 
-- (void)doCopy {
+- (void)doClip {
     [UIPasteboard generalPasteboard].string = _code;
-    [_copyBtn2 setTitle:@"✓" forState:UIControlStateNormal];
-    _copyBtn2.backgroundColor = [UIColor colorWithRed:0.1 green:0.65 blue:0.3 alpha:0.9];
+    [_clipBtn setTitle:@"✓" forState:UIControlStateNormal];
+    _clipBtn.backgroundColor = [UIColor colorWithRed:0.1 green:0.65 blue:0.3 alpha:0.9];
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2*NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-        [self->_copyBtn2 setTitle:@"نسخ" forState:UIControlStateNormal];
-        self->_copyBtn2.backgroundColor = [UIColor colorWithRed:0.094 green:0.373 blue:0.647 alpha:0.8];
+        [self->_clipBtn setTitle:@"نسخ" forState:UIControlStateNormal];
+        self->_clipBtn.backgroundColor = [UIColor colorWithRed:0.094 green:0.373 blue:0.647 alpha:0.8];
     });
 }
 
@@ -290,7 +282,7 @@ static BOOL checkApproved(NSString *code) {
                         options:UIViewAnimationOptionCurveEaseIn
                         animations:^{
                             self.alpha = 0;
-                            self.transform = CGAffineTransformMakeScale(0.95, 0.95);
+                            self.transform = CGAffineTransformMakeScale(0.95,0.95);
                         } completion:^(BOOL f){
                             self->_win.hidden = YES;
                             [self removeFromSuperview];
@@ -325,7 +317,6 @@ void BatAuthCheck(void) {
         BOOL      approved = [[NSUserDefaults standardUserDefaults] boolForKey:APPROVED_KEY];
 
         if (approved) {
-            // تحقق خفي في الخلفية
             dispatch_async(dispatch_get_global_queue(0,0), ^{
                 BOOL still = checkApproved(code);
                 if (!still) {
@@ -334,7 +325,7 @@ void BatAuthCheck(void) {
                     dispatch_async(dispatch_get_main_queue(), ^{ abort(); });
                 }
             });
-            return; // دخل مرة قبل — ما يطلع عليه شيء
+            return;
         }
 
         UIWindowScene *scene = nil;
@@ -345,14 +336,14 @@ void BatAuthCheck(void) {
             [[BatAuthWin alloc] initWithWindowScene:scene] :
             [[BatAuthWin alloc] initWithFrame:UIScreen.mainScreen.bounds];
 
-        win.windowLevel      = UIWindowLevelAlert + 999;
+        win.windowLevel            = UIWindowLevelAlert + 999;
         win.userInteractionEnabled = YES;
-        win.backgroundColor  = UIColor.blackColor;
+        win.backgroundColor        = UIColor.blackColor;
 
-        UIViewController *vc = [[UIViewController alloc] init];
-        vc.view.backgroundColor = UIColor.clearColor;
-        win.rootViewController  = vc;
-        win.hidden = NO;
+        UIViewController *vc       = [[UIViewController alloc] init];
+        vc.view.backgroundColor    = UIColor.clearColor;
+        win.rootViewController     = vc;
+        win.hidden                 = NO;
 
         BatAuthView *auth = [[BatAuthView alloc] initWithWindow:win];
         [vc.view addSubview:auth];
