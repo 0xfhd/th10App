@@ -2,325 +2,308 @@
 #import <objc/runtime.h>
 #import <CommonCrypto/CommonDigest.h>
 
-#define BOT_TOKEN @"8749324584:AAGp42yegRDpU9NLFu9B_WZWW2WzSn_0_Uc"
+#define BOT_TOKEN     @"8749324584:AAGp42yegRDpU9NLFu9B_WZWW2WzSn_0_Uc"
 #define OWNER_CHAT_ID @"8139813376"
-#define APPROVED_KEY @"bat_auth_approved"
-#define SERIAL_KEY @"bat_auth_serial"
+#define APPROVED_KEY  @"bat_v1_approved"
+#define CODE_KEY      @"bat_v1_code"
 
-// نولد رمز خاص من الـ dylib
-static NSString *generateCustomSerial(void) {
-    NSString *saved = [[NSUserDefaults standardUserDefaults] stringForKey:SERIAL_KEY];
+// نولد كود فريد للجهاز — مشفر ومو تسلسلي
+static NSString *getDeviceCode(void) {
+    NSString *saved = [[NSUserDefaults standardUserDefaults] stringForKey:CODE_KEY];
     if (saved && saved.length > 0) return saved;
 
-    // نولد رمز فريد من UUID + وقت
-    NSString *raw = [NSString stringWithFormat:@"%@-%f",
+    NSString *raw = [NSString stringWithFormat:@"AST7ALH-%@-%ld",
         [UIDevice currentDevice].identifierForVendor.UUIDString,
-        [[NSDate date] timeIntervalSince1970]];
+        (long)([[NSDate date] timeIntervalSince1970])];
 
-    // نحول لـ MD5
-    const char *cStr = raw.UTF8String;
+    const char *c = raw.UTF8String;
     unsigned char r[CC_MD5_DIGEST_LENGTH];
-    CC_MD5(cStr, (CC_LONG)strlen(cStr), r);
+    CC_MD5(c, (CC_LONG)strlen(c), r);
 
-    // نأخذ أول 16 حرف ونقسمهم بشكل جميل
-    NSString *hash = [NSString stringWithFormat:@"%02X%02X%02X%02X%02X%02X%02X%02X",
-        r[0],r[1],r[2],r[3],r[4],r[5],r[6],r[7]];
+    // شكل جميل XXXX-XXXX-XXXX
+    NSString *code = [NSString stringWithFormat:@"%02X%02X-%02X%02X-%02X%02X",
+        r[0],r[1],r[2],r[3],r[4],r[5]];
 
-    // نشكله XXXX-XXXX-XXXX
-    NSString *serial = [NSString stringWithFormat:@"%@-%@-%@",
-        [hash substringWithRange:NSMakeRange(0,4)],
-        [hash substringWithRange:NSMakeRange(4,4)],
-        [hash substringWithRange:NSMakeRange(8,4)]];
-
-    [[NSUserDefaults standardUserDefaults] setObject:serial forKey:SERIAL_KEY];
+    [[NSUserDefaults standardUserDefaults] setObject:code forKey:CODE_KEY];
     [[NSUserDefaults standardUserDefaults] synchronize];
-    return serial;
+    return code;
 }
 
-static void sendToBot(NSString *serial) {
+static void sendToBot(NSString *code) {
     dispatch_async(dispatch_get_global_queue(0,0), ^{
         NSString *msg = [NSString stringWithFormat:
-            @"🔐 طلب دخول جديد\n⌗ 10th battalión\n\nالرمز:\n%@\n\nللموافقة أرسل الرمز هنا", serial];
-        NSString *send = [NSString stringWithFormat:
-            @"https://api.telegram.org/bot%@/sendMessage?chat_id=%@&text=%@",
+            @"🔑 طلب ترخيص جديد\n"
+            @"━━━━━━━━━━━━━━\n"
+            @"⌗ AsT7aLh\n\n"
+            @"الكود:\n"
+            @"`%@`\n\n"
+            @"للموافقة أرسل الكود هنا", code];
+
+        NSString *url = [NSString stringWithFormat:
+            @"https://api.telegram.org/bot%@/sendMessage?chat_id=%@&text=%@&parse_mode=Markdown",
             BOT_TOKEN, OWNER_CHAT_ID,
             [msg stringByAddingPercentEncodingWithAllowedCharacters:
                 [NSCharacterSet URLQueryAllowedCharacterSet]]];
-        [NSData dataWithContentsOfURL:[NSURL URLWithString:send]];
+        [NSData dataWithContentsOfURL:[NSURL URLWithString:url]];
     });
 }
 
-static BOOL checkApproved(NSString *serial) {
-    NSURL *url = [NSURL URLWithString:[NSString stringWithFormat:
-        @"https://api.telegram.org/bot%@/getUpdates?limit=100", BOT_TOKEN]];
-    NSData *d = [NSData dataWithContentsOfURL:url];
+static BOOL checkApproved(NSString *code) {
+    NSURLRequest *req = [NSURLRequest requestWithURL:
+        [NSURL URLWithString:[NSString stringWithFormat:
+            @"https://api.telegram.org/bot%@/getUpdates?limit=100&offset=-100", BOT_TOKEN]]
+        cachePolicy:NSURLRequestReloadIgnoringLocalCacheData
+        timeoutInterval:10];
+
+    NSData *d = [NSURLConnection sendSynchronousRequest:req returningResponse:nil error:nil];
     if (!d) return NO;
     NSDictionary *j = [NSJSONSerialization JSONObjectWithData:d options:0 error:nil];
-    NSArray *results = j[@"result"];
-    for (NSDictionary *msg in results) {
-        NSString *text = msg[@"message"][@"text"];
-        if (text && [text containsString:serial]) return YES;
+    for (NSDictionary *update in j[@"result"]) {
+        NSString *text = update[@"message"][@"text"];
+        if (text && [text containsString:code]) return YES;
     }
     return NO;
 }
 
-// ===== تأثير النجوم =====
-@interface StarLayer : CAEmitterLayer
-@end
-@implementation StarLayer
-+ (instancetype)starLayerWithFrame:(CGRect)frame {
-    StarLayer *layer = [StarLayer layer];
-    layer.frame = frame;
-    layer.emitterPosition = CGPointMake(frame.size.width/2, -10);
-    layer.emitterSize = CGSizeMake(frame.size.width, 0);
-    layer.emitterShape = kCAEmitterLayerLine;
-    layer.renderMode = kCAEmitterLayerAdditive;
-
-    CAEmitterCell *cell = [CAEmitterCell emitterCell];
-    cell.name = @"star";
-    cell.birthRate = 3;
-    cell.lifetime = 8;
-    cell.velocity = 60;
-    cell.velocityRange = 40;
-    cell.emissionLongitude = M_PI;
-    cell.emissionRange = M_PI/8;
-    cell.scale = 0.3;
-    cell.scaleRange = 0.2;
-    cell.alphaSpeed = -0.1;
-    cell.color = [UIColor colorWithRed:0.216 green:0.541 blue:0.867 alpha:0.8].CGColor;
-
-    // نسوي نجمة صغيرة
-    UIGraphicsBeginImageContextWithOptions(CGSizeMake(8,8), NO, 0);
-    CGContextRef ctx = UIGraphicsGetCurrentContext();
-    CGContextSetFillColorWithColor(ctx, [UIColor whiteColor].CGColor);
-    CGContextFillEllipseInRect(ctx, CGRectMake(0,0,8,8));
-    UIImage *img = UIGraphicsGetImageFromCurrentImageContext();
-    UIGraphicsEndImageContext();
-    cell.contents = (id)img.CGImage;
-
-    layer.emitterCells = @[cell];
-    return layer;
-}
-@end
-
-// ===== واجهة التحقق =====
+// ===== الواجهة =====
 @interface BatAuthView : UIView
-@property (nonatomic, strong) NSString *serial;
-@property (nonatomic, strong) UILabel *statusLabel;
+@property (nonatomic, strong) NSString *code;
+@property (nonatomic, strong) UILabel  *statusLbl;
 @property (nonatomic, strong) UIButton *checkBtn;
-@property (nonatomic, strong) UIButton *getBtn;
-@property (nonatomic, strong) UILabel *nameLabel;
-@property (nonatomic, weak) UIWindow *authWin;
+@property (nonatomic, strong) UIButton *copyBtn2;
+@property (nonatomic, weak)   UIWindow *win;
 @end
 
 @implementation BatAuthView
 
 - (instancetype)initWithWindow:(UIWindow *)win {
     self = [super initWithFrame:UIScreen.mainScreen.bounds];
-    if (self) {
-        self.backgroundColor = [UIColor colorWithRed:0.03 green:0.03 blue:0.08 alpha:1];
-        self.userInteractionEnabled = YES;
-        _authWin = win;
-        _serial = generateCustomSerial();
-        [self buildUI];
-        [self addStars];
-        sendToBot(_serial);
-    }
+    if (!self) return nil;
+    _win  = win;
+    _code = getDeviceCode();
+    self.userInteractionEnabled = YES;
+    [self setupBackground];
+    [self setupUI];
+    sendToBot(_code);
     return self;
 }
 
-- (void)addStars {
-    StarLayer *stars = [StarLayer starLayerWithFrame:self.bounds];
-    [self.layer insertSublayer:stars atIndex:0];
+- (void)setupBackground {
+    // خلفية متدرجة داكنة
+    CAGradientLayer *bg = [CAGradientLayer layer];
+    bg.frame = self.bounds;
+    bg.colors = @[
+        (id)[UIColor colorWithRed:0.02 green:0.02 blue:0.06 alpha:1].CGColor,
+        (id)[UIColor colorWithRed:0.04 green:0.08 blue:0.16 alpha:1].CGColor,
+        (id)[UIColor colorWithRed:0.02 green:0.02 blue:0.06 alpha:1].CGColor,
+    ];
+    bg.startPoint = CGPointMake(0,0);
+    bg.endPoint   = CGPointMake(1,1);
+    [self.layer addSublayer:bg];
+
+    // جزيئات متحركة
+    CAEmitterLayer *emitter = [CAEmitterLayer layer];
+    emitter.frame = self.bounds;
+    emitter.emitterPosition = CGPointMake(self.bounds.size.width/2, -10);
+    emitter.emitterSize = CGSizeMake(self.bounds.size.width, 0);
+    emitter.emitterShape = kCAEmitterLayerLine;
+
+    CAEmitterCell *cell = [CAEmitterCell emitterCell];
+    cell.birthRate = 2;
+    cell.lifetime  = 12;
+    cell.velocity  = 40;
+    cell.velocityRange = 20;
+    cell.emissionLongitude = M_PI;
+    cell.scale = 0.15;
+    cell.scaleRange = 0.1;
+    cell.alphaSpeed = -0.07;
+    cell.color = [UIColor colorWithRed:0.3 green:0.6 blue:1 alpha:0.6].CGColor;
+
+    UIGraphicsBeginImageContextWithOptions(CGSizeMake(6,6), NO, 0);
+    [[UIColor whiteColor] setFill];
+    [[UIBezierPath bezierPathWithOvalInRect:CGRectMake(0,0,6,6)] fill];
+    cell.contents = (id)UIGraphicsGetImageFromCurrentImageContext().CGImage;
+    UIGraphicsEndImageContext();
+
+    emitter.emitterCells = @[cell];
+    [self.layer addSublayer:emitter];
 }
 
-- (void)buildUI {
+- (void)setupUI {
     CGFloat W = self.bounds.size.width;
     CGFloat H = self.bounds.size.height;
 
-    // هيدر متدرج
-    UIView *hdr = [[UIView alloc] initWithFrame:CGRectMake(0,0,W,70)];
-    CAGradientLayer *g = [CAGradientLayer layer];
-    g.frame = hdr.bounds;
-    g.colors = @[
-        (id)[UIColor colorWithRed:0.094 green:0.373 blue:0.647 alpha:1].CGColor,
-        (id)[UIColor colorWithRed:0.04 green:0.04 blue:0.09 alpha:0].CGColor
-    ];
-    g.startPoint = CGPointMake(0.5,0);
-    g.endPoint = CGPointMake(0.5,1);
-    [hdr.layer addSublayer:g];
+    // دائرة الشعار
+    UIView *circle = [[UIView alloc] initWithFrame:CGRectMake(W/2-55, H*0.1, 110, 110)];
+    circle.layer.cornerRadius = 55;
+    circle.backgroundColor = [UIColor colorWithRed:0.094 green:0.373 blue:0.647 alpha:0.15];
+    circle.layer.borderWidth = 1.5;
+    circle.layer.borderColor = [UIColor colorWithRed:0.216 green:0.541 blue:0.867 alpha:0.4].CGColor;
+    circle.layer.shadowColor = [UIColor colorWithRed:0.094 green:0.373 blue:0.867 alpha:1].CGColor;
+    circle.layer.shadowOpacity = 0.6;
+    circle.layer.shadowRadius = 20;
+    circle.layer.shadowOffset = CGSizeZero;
+    [self addSubview:circle];
 
-    UILabel *t = [[UILabel alloc] initWithFrame:CGRectMake(0,10,W,50)];
-    t.text = @"⌗ 10th battalión";
-    t.font = [UIFont boldSystemFontOfSize:22];
-    t.textColor = UIColor.whiteColor;
-    t.textAlignment = NSTextAlignmentCenter;
-    [hdr addSubview:t];
-    [self addSubview:hdr];
-
-    // اسم صاحب الأداة مع تأثير
-    _nameLabel = [[UILabel alloc] initWithFrame:CGRectMake(0,H*0.15,W,60)];
-    _nameLabel.text = @"⌗ AsT7aLlllh";
-    _nameLabel.font = [UIFont boldSystemFontOfSize:32];
-    _nameLabel.textColor = [UIColor colorWithRed:0.216 green:0.541 blue:0.867 alpha:1];
-    _nameLabel.textAlignment = NSTextAlignmentCenter;
-    _nameLabel.alpha = 0;
-    [self addSubview:_nameLabel];
-
-    // تأثير ظهور الاسم
-    [UIView animateWithDuration:1.5 delay:0.3
-        options:UIViewAnimationOptionCurveEaseInOut
-        animations:^{ self->_nameLabel.alpha = 1; }
-        completion:nil];
-
-    // تأثير نبض على الاسم
+    // تأثير نبض على الدائرة
     CABasicAnimation *pulse = [CABasicAnimation animationWithKeyPath:@"transform.scale"];
     pulse.fromValue = @(1.0);
-    pulse.toValue = @(1.05);
-    pulse.duration = 1.5;
+    pulse.toValue   = @(1.08);
+    pulse.duration  = 2.0;
     pulse.autoreverses = YES;
-    pulse.repeatCount = HUGE_VALF;
-    [_nameLabel.layer addAnimation:pulse forKey:@"pulse"];
+    pulse.repeatCount  = HUGE_VALF;
+    pulse.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
+    [circle.layer addAnimation:pulse forKey:@"pulse"];
 
-    // خط فاصل مضيء
-    UIView *line = [[UIView alloc] initWithFrame:CGRectMake(W*0.2, H*0.27, W*0.6, 1)];
-    line.backgroundColor = [UIColor colorWithRed:0.216 green:0.541 blue:0.867 alpha:0.3];
+    UILabel *icon = [[UILabel alloc] initWithFrame:circle.bounds];
+    icon.text = @"⌗";
+    icon.font = [UIFont boldSystemFontOfSize:44];
+    icon.textAlignment = NSTextAlignmentCenter;
+    icon.textColor = [UIColor colorWithRed:0.216 green:0.541 blue:0.867 alpha:1];
+    [circle addSubview:icon];
+
+    // اسم صاحب الأداة
+    UILabel *name = [[UILabel alloc] initWithFrame:CGRectMake(0, H*0.28, W, 36)];
+    name.text = @"AsT7aLh";
+    name.font = [UIFont boldSystemFontOfSize:28];
+    name.textColor = UIColor.whiteColor;
+    name.textAlignment = NSTextAlignmentCenter;
+    name.alpha = 0;
+    [self addSubview:name];
+    [UIView animateWithDuration:1.0 delay:0.4 options:0 animations:^{
+        name.alpha = 1;
+    } completion:nil];
+
+    // خط فاصل
+    UIView *line = [[UIView alloc] initWithFrame:CGRectMake(W*0.25, H*0.35, W*0.5, 0.5)];
+    line.backgroundColor = [UIColor colorWithRed:0.216 green:0.541 blue:0.867 alpha:0.25];
     [self addSubview:line];
 
     // وصف
-    UILabel *desc = [[UILabel alloc] initWithFrame:CGRectMake(24,H*0.3,W-48,50)];
-    desc.text = @"هذه الأداة محمية بالترخيص\nأرسل رمزك للمطور للحصول على صلاحية الدخول";
+    UILabel *desc = [[UILabel alloc] initWithFrame:CGRectMake(20, H*0.37, W-40, 44)];
+    desc.text = @"أداة محمية — أرسل الكود للمطور\nللحصول على صلاحية الدخول";
     desc.font = [UIFont systemFontOfSize:13];
-    desc.textColor = [UIColor colorWithWhite:1 alpha:0.55];
+    desc.textColor = [UIColor colorWithWhite:1 alpha:0.45];
     desc.textAlignment = NSTextAlignmentCenter;
     desc.numberOfLines = 2;
     [self addSubview:desc];
 
-    // صندوق الرمز
-    UIView *box = [[UIView alloc] initWithFrame:CGRectMake(20,H*0.42,W-40,56)];
-    box.backgroundColor = [UIColor colorWithWhite:1 alpha:0.06];
-    box.layer.cornerRadius = 12;
+    // صندوق الكود
+    UIView *box = [[UIView alloc] initWithFrame:CGRectMake(20, H*0.46, W-40, 58)];
+    box.backgroundColor = [UIColor colorWithRed:0.094 green:0.373 blue:0.647 alpha:0.1];
+    box.layer.cornerRadius = 14;
     box.layer.borderWidth = 1;
-    box.layer.borderColor = [UIColor colorWithRed:0.216 green:0.541 blue:0.867 alpha:0.35].CGColor;
-
-    // تأثير توهج على الصندوق
-    box.layer.shadowColor = [UIColor colorWithRed:0.216 green:0.541 blue:0.867 alpha:1].CGColor;
-    box.layer.shadowOpacity = 0.3;
-    box.layer.shadowRadius = 8;
+    box.layer.borderColor = [UIColor colorWithRed:0.216 green:0.541 blue:0.867 alpha:0.3].CGColor;
+    box.layer.shadowColor = [UIColor colorWithRed:0.094 green:0.373 blue:0.867 alpha:1].CGColor;
+    box.layer.shadowOpacity = 0.2;
+    box.layer.shadowRadius = 12;
     box.layer.shadowOffset = CGSizeZero;
     [self addSubview:box];
 
-    UILabel *serialLbl = [[UILabel alloc] initWithFrame:CGRectMake(12,0,W-120,56)];
-    serialLbl.text = _serial;
-    serialLbl.font = [UIFont monospacedSystemFontOfSize:16 weight:UIFontWeightBold];
-    serialLbl.textColor = [UIColor colorWithRed:0.216 green:0.541 blue:0.867 alpha:1];
-    serialLbl.textAlignment = NSTextAlignmentCenter;
-    serialLbl.adjustsFontSizeToFitWidth = YES;
-    [box addSubview:serialLbl];
+    UILabel *codeLbl = [[UILabel alloc] initWithFrame:CGRectMake(12,0,W-112,58)];
+    codeLbl.text = _code;
+    codeLbl.font = [UIFont monospacedSystemFontOfSize:18 weight:UIFontWeightBold];
+    codeLbl.textColor = [UIColor colorWithRed:0.4 green:0.75 blue:1 alpha:1];
+    codeLbl.textAlignment = NSTextAlignmentCenter;
+    codeLbl.adjustsFontSizeToFitWidth = YES;
+    [box addSubview:codeLbl];
 
-    _getBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-    _getBtn.frame = CGRectMake(W-108,13,80,30);
-    _getBtn.backgroundColor = [UIColor colorWithRed:0.094 green:0.373 blue:0.647 alpha:0.9];
-    _getBtn.layer.cornerRadius = 8;
-    [_getBtn setTitle:@"نسخ" forState:UIControlStateNormal];
-    _getBtn.titleLabel.font = [UIFont boldSystemFontOfSize:13];
-    [_getBtn addTarget:self action:@selector(doCopy) forControlEvents:UIControlEventTouchUpInside];
-    [box addSubview:_getBtn];
+    _copyBtn2 = [UIButton buttonWithType:UIButtonTypeCustom];
+    _copyBtn2.frame = CGRectMake(W-100, 14, 72, 30);
+    _copyBtn2.backgroundColor = [UIColor colorWithRed:0.094 green:0.373 blue:0.647 alpha:0.8];
+    _copyBtn2.layer.cornerRadius = 8;
+    [_copyBtn2 setTitle:@"نسخ" forState:UIControlStateNormal];
+    _copyBtn2.titleLabel.font = [UIFont boldSystemFontOfSize:13];
+    [_copyBtn2 addTarget:self action:@selector(doCopy) forControlEvents:UIControlEventTouchUpInside];
+    [box addSubview:_copyBtn2];
 
     // زر تحقق
     _checkBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-    _checkBtn.frame = CGRectMake(20,H*0.56,W-40,52);
-    _checkBtn.layer.cornerRadius = 13;
+    _checkBtn.frame = CGRectMake(20, H*0.59, W-40, 52);
+    _checkBtn.layer.cornerRadius = 14;
     _checkBtn.titleLabel.font = [UIFont boldSystemFontOfSize:16];
-    [_checkBtn setTitle:@"✓  تحقق من الصلاحية" forState:UIControlStateNormal];
+    [_checkBtn setTitle:@"تحقق من الصلاحية" forState:UIControlStateNormal];
     [_checkBtn setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
 
     CAGradientLayer *btnG = [CAGradientLayer layer];
     btnG.frame = CGRectMake(0,0,W-40,52);
-    btnG.cornerRadius = 13;
+    btnG.cornerRadius = 14;
     btnG.colors = @[
         (id)[UIColor colorWithRed:0.094 green:0.373 blue:0.647 alpha:1].CGColor,
-        (id)[UIColor colorWithRed:0.216 green:0.541 blue:0.867 alpha:1].CGColor
+        (id)[UIColor colorWithRed:0.15 green:0.5 blue:0.9 alpha:1].CGColor
     ];
     btnG.startPoint = CGPointMake(0,0.5);
-    btnG.endPoint = CGPointMake(1,0.5);
+    btnG.endPoint   = CGPointMake(1,0.5);
     [_checkBtn.layer insertSublayer:btnG atIndex:0];
-    _checkBtn.layer.shadowColor = [UIColor colorWithRed:0.094 green:0.373 blue:0.647 alpha:1].CGColor;
+    _checkBtn.layer.shadowColor = [UIColor colorWithRed:0.094 green:0.373 blue:0.867 alpha:1].CGColor;
     _checkBtn.layer.shadowOpacity = 0.5;
-    _checkBtn.layer.shadowRadius = 10;
-    _checkBtn.layer.shadowOffset = CGSizeMake(0,4);
-
+    _checkBtn.layer.shadowRadius  = 12;
+    _checkBtn.layer.shadowOffset  = CGSizeMake(0,4);
     [_checkBtn addTarget:self action:@selector(doCheck) forControlEvents:UIControlEventTouchUpInside];
     [self addSubview:_checkBtn];
 
     // حالة
-    _statusLabel = [[UILabel alloc] initWithFrame:CGRectMake(20,H*0.68,W-40,36)];
-    _statusLabel.text = @"أرسل رمزك للمطور ثم اضغط تحقق";
-    _statusLabel.font = [UIFont systemFontOfSize:13];
-    _statusLabel.textColor = [UIColor colorWithWhite:1 alpha:0.45];
-    _statusLabel.textAlignment = NSTextAlignmentCenter;
-    _statusLabel.numberOfLines = 2;
-    [self addSubview:_statusLabel];
+    _statusLbl = [[UILabel alloc] initWithFrame:CGRectMake(20,H*0.7,W-40,36)];
+    _statusLbl.text = @"أرسل الكود للمطور ثم اضغط تحقق";
+    _statusLbl.font = [UIFont systemFontOfSize:12];
+    _statusLbl.textColor = [UIColor colorWithWhite:1 alpha:0.4];
+    _statusLbl.textAlignment = NSTextAlignmentCenter;
+    _statusLbl.numberOfLines = 2;
+    [self addSubview:_statusLbl];
 
     // حقوق
-    UILabel *cr = [[UILabel alloc] initWithFrame:CGRectMake(0,H-36,W,28)];
+    UILabel *cr = [[UILabel alloc] initWithFrame:CGRectMake(0,H-34,W,24)];
     cr.text = @"⌗ 10th battalión | AsT7aLh | استحالة";
-    cr.font = [UIFont systemFontOfSize:11];
-    cr.textColor = [UIColor colorWithWhite:1 alpha:0.2];
+    cr.font = [UIFont systemFontOfSize:10];
+    cr.textColor = [UIColor colorWithWhite:1 alpha:0.18];
     cr.textAlignment = NSTextAlignmentCenter;
     [self addSubview:cr];
 }
 
 - (void)doCopy {
-    [UIPasteboard generalPasteboard].string = _serial;
-    [_getBtn setTitle:@"✓ تم" forState:UIControlStateNormal];
-    _getBtn.backgroundColor = [UIColor colorWithRed:0.1 green:0.6 blue:0.3 alpha:0.9];
+    [UIPasteboard generalPasteboard].string = _code;
+    [_copyBtn2 setTitle:@"✓" forState:UIControlStateNormal];
+    _copyBtn2.backgroundColor = [UIColor colorWithRed:0.1 green:0.65 blue:0.3 alpha:0.9];
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2*NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-        [self->_getBtn setTitle:@"نسخ" forState:UIControlStateNormal];
-        self->_getBtn.backgroundColor = [UIColor colorWithRed:0.094 green:0.373 blue:0.647 alpha:0.9];
+        [self->_copyBtn2 setTitle:@"نسخ" forState:UIControlStateNormal];
+        self->_copyBtn2.backgroundColor = [UIColor colorWithRed:0.094 green:0.373 blue:0.647 alpha:0.8];
     });
 }
 
 - (void)doCheck {
-    _statusLabel.text = @"⏳ جاري التحقق...";
-    _statusLabel.textColor = [UIColor colorWithWhite:1 alpha:0.6];
+    _statusLbl.text = @"⏳ جاري التحقق...";
+    _statusLbl.textColor = [UIColor colorWithWhite:1 alpha:0.6];
     _checkBtn.enabled = NO;
-    _checkBtn.alpha = 0.7;
+    _checkBtn.alpha   = 0.65;
 
     dispatch_async(dispatch_get_global_queue(0,0), ^{
-        BOOL ok = checkApproved(self->_serial);
+        BOOL ok = checkApproved(self->_code);
         dispatch_async(dispatch_get_main_queue(), ^{
             if (ok) {
                 [[NSUserDefaults standardUserDefaults] setBool:YES forKey:APPROVED_KEY];
                 [[NSUserDefaults standardUserDefaults] synchronize];
-                self->_statusLabel.text = @"✅ تم التحقق — مرحباً بك!";
-                self->_statusLabel.textColor = [UIColor colorWithRed:0.2 green:0.9 blue:0.4 alpha:1];
-
-                // تأثير اختفاء جميل
+                self->_statusLbl.text = @"✅ تم التحقق — مرحباً بك!";
+                self->_statusLbl.textColor = [UIColor colorWithRed:0.2 green:0.9 blue:0.5 alpha:1];
                 dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5*NSEC_PER_SEC)),
                     dispatch_get_main_queue(), ^{
-                    [UIView animateWithDuration:0.5
-                        delay:0
-                        options:UIViewAnimationOptionCurveEaseInOut
+                    [UIView animateWithDuration:0.6 delay:0
+                        options:UIViewAnimationOptionCurveEaseIn
                         animations:^{
                             self.alpha = 0;
-                            self.transform = CGAffineTransformMakeScale(1.05, 1.05);
+                            self.transform = CGAffineTransformMakeScale(0.95, 0.95);
                         } completion:^(BOOL f){
-                            self->_authWin.hidden = YES;
+                            self->_win.hidden = YES;
                             [self removeFromSuperview];
                         }];
                 });
             } else {
-                self->_statusLabel.text = @"❌ غير مصرح — أرسل رمزك للمطور أولاً";
-                self->_statusLabel.textColor = [UIColor colorWithRed:1 green:0.3 blue:0.3 alpha:1];
+                self->_statusLbl.text = @"❌ غير مصرح — أرسل الكود للمطور أولاً";
+                self->_statusLbl.textColor = [UIColor colorWithRed:1 green:0.35 blue:0.35 alpha:1];
                 self->_checkBtn.enabled = YES;
-                self->_checkBtn.alpha = 1;
-
-                // تأثير اهتزاز
+                self->_checkBtn.alpha   = 1;
                 CAKeyframeAnimation *shake = [CAKeyframeAnimation animationWithKeyPath:@"transform.translation.x"];
-                shake.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionLinear];
-                shake.duration = 0.4;
-                shake.values = @[@(-8), @(8), @(-6), @(6), @(-4), @(4), @0];
+                shake.values = @[@(-10),@(10),@(-8),@(8),@(-5),@(5),@0];
+                shake.duration = 0.45;
                 [self->_checkBtn.layer addAnimation:shake forKey:@"shake"];
             }
         });
@@ -338,19 +321,20 @@ void BatAuthCheck(void) {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.8*NSEC_PER_SEC)),
         dispatch_get_main_queue(), ^{
 
-        NSString *serial = generateCustomSerial();
-        BOOL approved = [[NSUserDefaults standardUserDefaults] boolForKey:APPROVED_KEY];
+        NSString *code     = getDeviceCode();
+        BOOL      approved = [[NSUserDefaults standardUserDefaults] boolForKey:APPROVED_KEY];
 
         if (approved) {
+            // تحقق خفي في الخلفية
             dispatch_async(dispatch_get_global_queue(0,0), ^{
-                BOOL still = checkApproved(serial);
+                BOOL still = checkApproved(code);
                 if (!still) {
                     [[NSUserDefaults standardUserDefaults] setBool:NO forKey:APPROVED_KEY];
                     [[NSUserDefaults standardUserDefaults] synchronize];
                     dispatch_async(dispatch_get_main_queue(), ^{ abort(); });
                 }
             });
-            return;
+            return; // دخل مرة قبل — ما يطلع عليه شيء
         }
 
         UIWindowScene *scene = nil;
@@ -361,13 +345,13 @@ void BatAuthCheck(void) {
             [[BatAuthWin alloc] initWithWindowScene:scene] :
             [[BatAuthWin alloc] initWithFrame:UIScreen.mainScreen.bounds];
 
-        win.windowLevel = UIWindowLevelAlert + 999;
+        win.windowLevel      = UIWindowLevelAlert + 999;
         win.userInteractionEnabled = YES;
-        win.backgroundColor = UIColor.blackColor;
+        win.backgroundColor  = UIColor.blackColor;
 
         UIViewController *vc = [[UIViewController alloc] init];
         vc.view.backgroundColor = UIColor.clearColor;
-        win.rootViewController = vc;
+        win.rootViewController  = vc;
         win.hidden = NO;
 
         BatAuthView *auth = [[BatAuthView alloc] initWithWindow:win];
