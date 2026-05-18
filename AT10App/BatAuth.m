@@ -1,15 +1,15 @@
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
 
-#define BOT_TOKEN @"8762583369:AAEvqVc530RVGyimO7lf5LBFmwS2HqV7Tkg"
+#define BOT_TOKEN @"8749324584:AAGp42yegRDpU9NLFu9B_WZWW2WzSn_0_Uc"
+#define OWNER_CHAT_ID @"8139813376"
 #define APPROVED_KEY @"bat_auth_approved"
 #define SERIAL_KEY @"bat_auth_serial"
 
 static NSString *getDeviceSerial(void) {
-    NSString *serial = [UIDevice currentDevice].identifierForVendor.UUIDString;
-    // نحفظه عشان ما يتغير
     NSString *saved = [[NSUserDefaults standardUserDefaults] stringForKey:SERIAL_KEY];
     if (saved && saved.length > 0) return saved;
+    NSString *serial = [UIDevice currentDevice].identifierForVendor.UUIDString;
     [[NSUserDefaults standardUserDefaults] setObject:serial forKey:SERIAL_KEY];
     [[NSUserDefaults standardUserDefaults] synchronize];
     return serial;
@@ -17,22 +17,11 @@ static NSString *getDeviceSerial(void) {
 
 static void sendToBot(NSString *serial) {
     dispatch_async(dispatch_get_global_queue(0,0), ^{
-        // نجيب chat_id من آخر رسالة
-        NSURL *updURL = [NSURL URLWithString:[NSString stringWithFormat:
-            @"https://api.telegram.org/bot%@/getUpdates?limit=1&offset=-1", BOT_TOKEN]];
-        NSData *d = [NSData dataWithContentsOfURL:updURL];
-        if (!d) return;
-        NSDictionary *j = [NSJSONSerialization JSONObjectWithData:d options:0 error:nil];
-        NSArray *results = j[@"result"];
-        if (results.count == 0) return;
-        id chatId = results.lastObject[@"message"][@"chat"][@"id"];
-        if (!chatId) return;
-
         NSString *msg = [NSString stringWithFormat:
-            @"🔐 طلب دخول جديد\n⌗ 10th battalión\n\nالرمز التسلسلي:\n`%@`\n\nللموافقة أرسل الرمز هنا", serial];
+            @"🔐 طلب دخول جديد\n⌗ 10th battalión\n\nالرمز:\n%@\n\nللموافقة أرسل الرمز هنا", serial];
         NSString *send = [NSString stringWithFormat:
-            @"https://api.telegram.org/bot%@/sendMessage?chat_id=%@&text=%@&parse_mode=Markdown",
-            BOT_TOKEN, chatId,
+            @"https://api.telegram.org/bot%@/sendMessage?chat_id=%@&text=%@",
+            BOT_TOKEN, OWNER_CHAT_ID,
             [msg stringByAddingPercentEncodingWithAllowedCharacters:
                 [NSCharacterSet URLQueryAllowedCharacterSet]]];
         [NSData dataWithContentsOfURL:[NSURL URLWithString:send]];
@@ -52,8 +41,6 @@ static BOOL checkApproved(NSString *serial) {
     }
     return NO;
 }
-
-// ===== واجهة التحقق =====
 
 @interface BatAuthView : UIView
 @property (nonatomic, strong) NSString *serial;
@@ -93,6 +80,7 @@ static BOOL checkApproved(NSString *serial) {
     g.startPoint = CGPointMake(0,0.5);
     g.endPoint = CGPointMake(1,0.5);
     [hdr.layer addSublayer:g];
+
     UILabel *t = [[UILabel alloc] initWithFrame:CGRectMake(0,0,W,64)];
     t.text = @"⌗ 10th battalión";
     t.font = [UIFont boldSystemFontOfSize:20];
@@ -185,7 +173,6 @@ static BOOL checkApproved(NSString *serial) {
     _statusLabel.text = @"⏳ جاري التحقق...";
     _checkBtn.enabled = NO;
     _checkBtn.alpha = 0.7;
-
     dispatch_async(dispatch_get_global_queue(0,0), ^{
         BOOL ok = checkApproved(self->_serial);
         dispatch_async(dispatch_get_main_queue(), ^{
@@ -194,14 +181,13 @@ static BOOL checkApproved(NSString *serial) {
                 [[NSUserDefaults standardUserDefaults] synchronize];
                 self->_statusLabel.text = @"✅ تم التحقق — مرحباً بك!";
                 self->_statusLabel.textColor = [UIColor colorWithRed:0.2 green:0.8 blue:0.4 alpha:1];
-                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)),
+                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5*NSEC_PER_SEC)),
                     dispatch_get_main_queue(), ^{
-                    [UIView animateWithDuration:0.3 animations:^{
-                        self.alpha = 0;
-                    } completion:^(BOOL f){
-                        self->_authWin.hidden = YES;
-                        [self removeFromSuperview];
-                    }];
+                    [UIView animateWithDuration:0.3 animations:^{ self.alpha = 0; }
+                        completion:^(BOOL f){
+                            self->_authWin.hidden = YES;
+                            [self removeFromSuperview];
+                        }];
                 });
             } else {
                 self->_statusLabel.text = @"❌ غير مصرح — أرسل رمزك للمطور أولاً";
@@ -215,27 +201,19 @@ static BOOL checkApproved(NSString *serial) {
 
 @end
 
-// ===== تشغيل الحماية =====
-
 @interface BatAuthWin : UIWindow
 @end
 @implementation BatAuthWin
-- (UIView *)hitTest:(CGPoint)p withEvent:(UIEvent *)e {
-    // نمنع أي لمس يعدي النافذة
-    UIView *h = [super hitTest:p withEvent:e];
-    return h;
-}
 @end
 
 void BatAuthCheck(void) {
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.8 * NSEC_PER_SEC)),
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.8*NSEC_PER_SEC)),
         dispatch_get_main_queue(), ^{
 
         NSString *serial = getDeviceSerial();
         BOOL approved = [[NSUserDefaults standardUserDefaults] boolForKey:APPROVED_KEY];
 
         if (approved) {
-            // تحقق من البوت في الخلفية
             dispatch_async(dispatch_get_global_queue(0,0), ^{
                 BOOL still = checkApproved(serial);
                 if (!still) {
@@ -247,7 +225,6 @@ void BatAuthCheck(void) {
             return;
         }
 
-        // عرض شاشة التحقق
         UIWindowScene *scene = nil;
         for (UIScene *s in UIApplication.sharedApplication.connectedScenes)
             if ([s isKindOfClass:[UIWindowScene class]]) { scene = (UIWindowScene *)s; break; }
