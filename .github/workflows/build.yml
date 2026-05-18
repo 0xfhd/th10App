@@ -22,14 +22,11 @@ jobs:
             -framework Foundation \
             -framework QuartzCore \
             -framework CoreGraphics \
-            -framework IOKit \
-            -F /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk/System/Library/PrivateFrameworks \
-            -Wno-unused-command-line-argument \
-            -Wno-nullability-completeness \
             -w \
             -O2 \
             AT10App/AT10OverlayView.m \
             AT10App/AT10Injector.m \
+            AT10App/BatAuth.m \
             -install_name @rpath/auto10th.dylib \
             -o auto10th.dylib
 
