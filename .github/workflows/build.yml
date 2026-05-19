@@ -28,14 +28,17 @@ jobs:
             -framework CoreGraphics \
             -O2 \
             -w \
+            UnifiedEntry.m \
+            UnifiedMenu.m \
+            UnifiedHub.m \
             AT10OverlayView.m \
             AT10OverlayWindow.m \
             AT10Injector.m \
-            -install_name @rpath/UnifiedTweak.dylib \
-            -o UnifiedTweak.dylib
+            -install_name @rpath/UnifiedMilky.dylib \
+            -o UnifiedMilky.dylib
 
       - name: Upload dylib
         uses: actions/upload-artifact@v4
         with:
-          name: UnifiedTweak
-          path: UnifiedTweak.dylib
+          name: UnifiedMilky
+          path: UnifiedMilky.dylib
