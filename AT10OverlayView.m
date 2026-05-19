@@ -45,7 +45,7 @@ static inline CGRect  ZeroRect(void)  { return CGRectMake(0.0, 0.0, 0.0, 0.0); }
         self.backgroundColor = UIColor.clearColor;
         self.userInteractionEnabled = YES;
         _cps = 120;
-        _credit = @"10th | AsT7aLh";
+        _credit = @"⌗ أستحالة إلمقاطي .. | ⌗ 10th battalión";
         [self buildDot];
         [self buildPanel];
     }
@@ -102,7 +102,7 @@ static inline CGRect  ZeroRect(void)  { return CGRectMake(0.0, 0.0, 0.0, 0.0); }
     [hdr.layer addSublayer:g];
 
     UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(10,0,155,36)];
-    title.text = @"10th - AsT7aLh";
+    title.text = @"⌗ 10th battalión";
     title.font = [UIFont boldSystemFontOfSize:10.5];
     title.textColor = UIColor.whiteColor;
     [hdr addSubview:title];
@@ -170,7 +170,7 @@ static inline CGRect  ZeroRect(void)  { return CGRectMake(0.0, 0.0, 0.0, 0.0); }
     [_panelBody addSubview:row2];
     y += 26;
 
-    UILabel *cr = [self lbl:@"AsT7aLh | استحالة" x:10 y:y w:190 bold:NO];
+    UILabel *cr = [self lbl:@"⌗ أستحالة إلمقاطي .." x:10 y:y w:190 bold:NO];
     cr.textAlignment = NSTextAlignmentCenter;
     cr.textColor = [UIColor colorWithRed:0.66 green:0.78 blue:0.93 alpha:1];
     cr.backgroundColor = [UIColor colorWithRed:0.94 green:0.97 blue:1.0 alpha:1];
