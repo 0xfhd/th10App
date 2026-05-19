@@ -2,64 +2,49 @@
 #import <QuartzCore/QuartzCore.h>
 
 extern void StartUnifiedMenu(void);
-extern void StartAutoClicker(void);
-extern void StartProtection(void);
-extern void StartAnimationBooster(void);
 
-static void SetupMiniMode(void) {
+extern void StartProtection(void) __attribute__((weak_import));
+extern void BatAuthCheck(void) __attribute__((weak_import));
 
-    UIWindow *window =
-    UIApplication.sharedApplication.keyWindow;
+extern void StartAutoClicker(void) __attribute__((weak_import));
+extern void StartAnimationBooster(void) __attribute__((weak_import));
 
-    if (!window) return;
+static void RunAuthFirst(void) {
+    if (StartProtection) {
+        StartProtection();
+        return;
+    }
 
-    window.layer.cornerRadius = 22.0;
-    window.layer.masksToBounds = YES;
+    if (BatAuthCheck) {
+        BatAuthCheck();
+        return;
+    }
+}
 
-    [UIView animateWithDuration:0.25 animations:^{
+static void RunModules(void) {
+    if (StartAutoClicker) {
+        StartAutoClicker();
+    }
 
-        window.transform =
-        CGAffineTransformMakeScale(0.82, 0.82);
+    if (StartAnimationBooster) {
+        StartAnimationBooster();
+    }
 
-        window.center =
-        CGPointMake(
-        UIScreen.mainScreen.bounds.size.width / 2,
-        UIScreen.mainScreen.bounds.size.height / 2 + 40);
-    }];
+    StartUnifiedMenu();
 }
 
 __attribute__((constructor))
 static void UnifiedStart(void) {
-
     @autoreleasepool {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC),
+        dispatch_get_main_queue(), ^{
 
-        dispatch_after(
-            dispatch_time(DISPATCH_TIME_NOW,
-            2 * NSEC_PER_SEC),
+            RunAuthFirst();
 
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC),
             dispatch_get_main_queue(), ^{
-
-            // الحماية أولاً
-            StartProtection();
-
-            dispatch_after(
-                dispatch_time(DISPATCH_TIME_NOW,
-                2 * NSEC_PER_SEC),
-
-                dispatch_get_main_queue(), ^{
-
-                // الأوتو كلكر
-                StartAutoClicker();
-
-                // السبيد
-                StartAnimationBooster();
-
-                // القائمة
-                StartUnifiedMenu();
-
-                // تصغير الشاشة
-                SetupMiniMode();
+                RunModules();
             });
         });
     }
-}
+}س
