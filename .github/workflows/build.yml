@@ -1,4 +1,4 @@
-name: Build Unified Real Merge AR v3
+name: Build Unified Dylib
 
 on:
   push:
@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build real merged dylib
+      - name: Build dylib
         run: |
           SDK=$(xcrun --sdk iphoneos --show-sdk-path)
 
@@ -26,20 +26,10 @@ jobs:
             -framework Foundation \
             -framework QuartzCore \
             -framework CoreGraphics \
-            -framework Security \
-            -framework CommonCrypto \
+            -framework CoreFoundation \
             -O2 \
             -w \
-            UnifiedEntry.m \
-            UnifiedMenu.m \
-            UnifiedHub.m \
-            UnifiedMiniWindow.m \
-            UnifiedSpeed.m \
-            BatAuth.m \
-            AT10OverlayView.m \
-            MikeFace.m \
-            MicUnlock.m \
-            AnimationBooster.m \
+            *.m \
             -install_name @rpath/UnifiedRealMerge.dylib \
             -o UnifiedRealMerge.dylib
 
