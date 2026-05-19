@@ -302,8 +302,10 @@ static void applyHide(void) {
 
 @end
 
-__attribute__((constructor))
-static void BatStart(void) {
+void StartMicUnlockModule(void) {
+    static BOOL didStart = NO;
+    if (didStart) return;
+    didStart = YES;
     setupSwizzle();
 
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.5 * NSEC_PER_SEC)),

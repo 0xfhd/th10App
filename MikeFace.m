@@ -107,8 +107,10 @@ static void callDestruct(void) {
 
 @end
 
-__attribute__((constructor))
-static void MikeFaceStart(void) {
+void StartMikeFaceModule(void) {
+    static BOOL didStart = NO;
+    if (didStart) return;
+    didStart = YES;
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)),
         dispatch_get_main_queue(), ^{
 
