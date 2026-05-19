@@ -10,6 +10,7 @@ extern void StartAutoClicker(void) __attribute__((weak_import));
 extern void StartAnimationBooster(void) __attribute__((weak_import));
 
 static void RunAuthFirst(void) {
+
     if (StartProtection) {
         StartProtection();
         return;
@@ -22,6 +23,7 @@ static void RunAuthFirst(void) {
 }
 
 static void RunModules(void) {
+
     if (StartAutoClicker) {
         StartAutoClicker();
     }
@@ -35,16 +37,25 @@ static void RunModules(void) {
 
 __attribute__((constructor))
 static void UnifiedStart(void) {
+
     @autoreleasepool {
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC),
-        dispatch_get_main_queue(), ^{
+
+        dispatch_after(
+            dispatch_time(DISPATCH_TIME_NOW,
+            2 * NSEC_PER_SEC),
+
+            dispatch_get_main_queue(), ^{
 
             RunAuthFirst();
 
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC),
-            dispatch_get_main_queue(), ^{
+            dispatch_after(
+                dispatch_time(DISPATCH_TIME_NOW,
+                2 * NSEC_PER_SEC),
+
+                dispatch_get_main_queue(), ^{
+
                 RunModules();
             });
         });
     }
-}س
+}
