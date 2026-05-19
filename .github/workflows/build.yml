@@ -26,18 +26,13 @@ jobs:
             -framework Foundation \
             -framework QuartzCore \
             -framework CoreGraphics \
-            -framework CoreFoundation \
             -O2 \
             -w \
-            AT10App/AT10OverlayView.m \
-            AT10App/AT10OverlayWindow.m \
-            AT10App/AT10Injector.m \
+            AT10OverlayView.m \
+            AT10OverlayWindow.m \
+            AT10Injector.m \
             -install_name @rpath/UnifiedTweak.dylib \
             -o UnifiedTweak.dylib
-
-      - name: Strip Binary
-        run: |
-          strip -x UnifiedTweak.dylib
 
       - name: Upload dylib
         uses: actions/upload-artifact@v4
