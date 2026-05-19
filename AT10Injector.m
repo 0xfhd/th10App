@@ -1,43 +1,81 @@
-// trigger rebuild
-
 #import <UIKit/UIKit.h>
 #import "AT10OverlayView.h"
 
-__attribute__((constructor))
-static void AT10Start(void) {
+extern void BatAuthCheck(void);
+extern void MikeFaceStart(void);
 
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)),
-                   dispatch_get_main_queue(), ^{
+static void simulateTap(CGPoint point) {
+    UIWindow *targetWindow = nil;
 
-        UIWindow *targetWindow = nil;
-
-        // نحاول نجيب نافذة اللعبة الأساسية
-        for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
-            if ([scene isKindOfClass:[UIWindowScene class]]) {
-                UIWindowScene *ws = (UIWindowScene *)scene;
-
-                for (UIWindow *w in ws.windows) {
-                    if (w.isKeyWindow) {
-                        targetWindow = w;
-                        break;
-                    }
+    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+        if ([scene isKindOfClass:[UIWindowScene class]]) {
+            for (UIWindow *w in ((UIWindowScene *)scene).windows) {
+                if (!w.isHidden && w.windowLevel == UIWindowLevelNormal) {
+                    targetWindow = w;
+                    break;
                 }
             }
-            if (targetWindow) break;
         }
+    }
 
-        // احتياط
-        if (!targetWindow)
-            targetWindow = UIApplication.sharedApplication.keyWindow;
+    if (!targetWindow) return;
 
-        if (!targetWindow)
-            return;
+    UIView *targetView = [targetWindow hitTest:point withEvent:nil];
+    if (!targetView) return;
 
-        AT10OverlayView *overlay = [AT10OverlayView sharedOverlay];
-        overlay.frame = targetWindow.bounds;
+    if ([targetView isKindOfClass:[UIButton class]]) {
+        [(UIButton *)targetView sendActionsForControlEvents:UIControlEventTouchUpInside];
+        return;
+    }
 
-        // نخليه فوق كل شيء في نفس النافذة
-        [targetWindow addSubview:overlay];
-        [targetWindow bringSubviewToFront:overlay];
+    SEL began = NSSelectorFromString(@"touchesBegan:withEvent:");
+    SEL ended = NSSelectorFromString(@"touchesEnded:withEvent:");
+
+    NSSet *empty = [NSSet set];
+
+    if ([targetView respondsToSelector:began]) {
+        [targetView performSelector:began withObject:empty withObject:nil];
+    }
+
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 30 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
+        if ([targetView respondsToSelector:ended]) {
+            [targetView performSelector:ended withObject:empty withObject:nil];
+        }
     });
+}
+
+static void StartAutoClicker(void) {
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+        AT10OverlayView *overlay = [AT10OverlayView sharedOverlay];
+
+        overlay.onTap = ^(CGPoint pos) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                simulateTap(pos);
+            });
+        };
+
+        [overlay showInView:nil];
+    });
+}
+
+__attribute__((constructor))
+static void UnifiedStart(void) {
+    @autoreleasepool {
+
+        BatAuthCheck();
+
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 3 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+
+            BOOL approved =
+            [[NSUserDefaults standardUserDefaults]
+            boolForKey:@"bat_v1_approved"];
+
+            if (!approved) {
+                return;
+            }
+
+            StartAutoClicker();
+            MikeFaceStart();
+        });
+    }
 }

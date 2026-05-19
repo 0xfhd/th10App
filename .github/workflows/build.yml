@@ -1,6 +1,8 @@
-name: Build AT10 dylib
+name: Build Unified Dylib
 
-on: [push]
+on:
+  push:
+  workflow_dispatch:
 
 jobs:
   build:
@@ -12,26 +14,33 @@ jobs:
       - name: Build dylib
         run: |
           SDK=$(xcrun --sdk iphoneos --show-sdk-path)
-          
-          clang -dynamiclib \
+
+          clang \
+            -dynamiclib \
             -arch arm64 \
             -isysroot $SDK \
             -miphoneos-version-min=14.0 \
             -fobjc-arc \
+            -ObjC \
             -framework UIKit \
             -framework Foundation \
             -framework QuartzCore \
             -framework CoreGraphics \
-            -w \
+            -framework CoreFoundation \
             -O2 \
+            -w \
             AT10App/AT10OverlayView.m \
+            AT10App/AT10OverlayWindow.m \
             AT10App/AT10Injector.m \
-            AT10App/BatAuth.m \
-            -install_name @rpath/auto10th.dylib \
-            -o auto10th.dylib
+            -install_name @rpath/UnifiedTweak.dylib \
+            -o UnifiedTweak.dylib
+
+      - name: Strip Binary
+        run: |
+          strip -x UnifiedTweak.dylib
 
       - name: Upload dylib
         uses: actions/upload-artifact@v4
         with:
-          name: auto10th-dylib
-          path: auto10th.dylib
+          name: UnifiedTweak
+          path: UnifiedTweak.dylib
