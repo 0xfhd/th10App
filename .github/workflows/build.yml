@@ -1,4 +1,4 @@
-name: Build Unified Dylib
+name: Build Real Merged Dylib
 
 on:
   push:
@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build dylib
+      - name: Build real merged dylib
         run: |
           SDK=$(xcrun --sdk iphoneos --show-sdk-path)
 
@@ -32,13 +32,15 @@ jobs:
             UnifiedMenu.m \
             UnifiedHub.m \
             AT10OverlayView.m \
-            AT10OverlayWindow.m \
-            AT10Injector.m \
-            -install_name @rpath/UnifiedMilky.dylib \
-            -o UnifiedMilky.dylib
+            MikeFace.m \
+            MicUnlock.m \
+            AnimationBooster.m \
+            SpeedOverlay.m \
+            -install_name @rpath/UnifiedRealMerge.dylib \
+            -o UnifiedRealMerge.dylib
 
       - name: Upload dylib
         uses: actions/upload-artifact@v4
         with:
-          name: UnifiedMilky
-          path: UnifiedMilky.dylib
+          name: UnifiedRealMerge
+          path: UnifiedRealMerge.dylib

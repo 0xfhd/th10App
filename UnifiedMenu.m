@@ -3,28 +3,23 @@
 extern void HubEnable(void);
 extern void HubDisable(void);
 
-static UIWindow *menuWindow;
-static UIView *menuView;
+static UIWindow *gUnifiedMenuWindow;
+static UIView *gUnifiedMenuView;
 
-@interface UnifiedMenu : NSObject
+@interface UnifiedMenuController : NSObject
 @end
 
-@implementation UnifiedMenu
+@implementation UnifiedMenuController
 
 + (instancetype)shared {
-
-    static UnifiedMenu *m;
+    static UnifiedMenuController *obj;
     static dispatch_once_t once;
-
-    dispatch_once(&once, ^{
-        m = [UnifiedMenu new];
-    });
-
-    return m;
+    dispatch_once(&once, ^{ obj = [UnifiedMenuController new]; });
+    return obj;
 }
 
 - (void)toggle {
-    menuView.hidden = !menuView.hidden;
+    gUnifiedMenuView.hidden = !gUnifiedMenuView.hidden;
 }
 
 - (void)link {
@@ -36,146 +31,61 @@ static UIView *menuView;
 }
 
 - (void)hide {
-    menuView.hidden = YES;
+    gUnifiedMenuView.hidden = YES;
 }
 
 - (void)remove {
-
-    [menuWindow removeFromSuperview];
-
-    menuWindow = nil;
-    menuView = nil;
+    [gUnifiedMenuWindow removeFromSuperview];
+    gUnifiedMenuWindow = nil;
+    gUnifiedMenuView = nil;
 }
 
 @end
 
-static UIButton *MakeButton(
-NSString *title,
-CGFloat y,
-SEL action) {
-
-    UIButton *btn =
-    [UIButton buttonWithType:
-    UIButtonTypeSystem];
-
-    btn.frame =
-    CGRectMake(15, y, 210, 40);
-
+static UIButton *UnifiedMakeButton(NSString *title, CGFloat y, SEL action) {
+    UIButton *btn = [UIButton buttonWithType:UIButtonTypeSystem];
+    btn.frame = CGRectMake(15, y, 210, 40);
     btn.layer.cornerRadius = 12;
-
-    btn.backgroundColor =
-    [[UIColor blackColor]
-    colorWithAlphaComponent:0.65];
-
-    [btn setTitle:title
-    forState:UIControlStateNormal];
-
-    [btn setTitleColor:
-    UIColor.whiteColor
-    forState:UIControlStateNormal];
-
-    [btn addTarget:
-    [UnifiedMenu shared]
-    action:action
-    forControlEvents:
-    UIControlEventTouchUpInside];
-
+    btn.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.65];
+    [btn setTitle:title forState:UIControlStateNormal];
+    [btn setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
+    btn.titleLabel.font = [UIFont boldSystemFontOfSize:14];
+    [btn addTarget:[UnifiedMenuController shared] action:action forControlEvents:UIControlEventTouchUpInside];
     return btn;
 }
 
 void StartUnifiedMenu(void) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (gUnifiedMenuWindow) return;
 
-    dispatch_async(
-    dispatch_get_main_queue(), ^{
+        CGRect frame = UIScreen.mainScreen.bounds;
+        gUnifiedMenuWindow = [[UIWindow alloc] initWithFrame:frame];
+        gUnifiedMenuWindow.windowLevel = UIWindowLevelAlert + 999;
+        gUnifiedMenuWindow.backgroundColor = UIColor.clearColor;
 
-        CGRect frame =
-        UIScreen.mainScreen.bounds;
+        UIViewController *vc = [UIViewController new];
+        vc.view.backgroundColor = UIColor.clearColor;
+        gUnifiedMenuWindow.rootViewController = vc;
+        gUnifiedMenuWindow.hidden = NO;
 
-        menuWindow =
-        [[UIWindow alloc]
-        initWithFrame:frame];
-
-        menuWindow.windowLevel =
-        UIWindowLevelAlert + 999;
-
-        UIViewController *vc =
-        [UIViewController new];
-
-        menuWindow.rootViewController = vc;
-
-        menuWindow.hidden = NO;
-
-        UIButton *open =
-        [UIButton buttonWithType:
-        UIButtonTypeSystem];
-
-        open.frame =
-        CGRectMake(
-        (frame.size.width - 54) / 2,
-        42,
-        54,
-        32);
-
+        UIButton *open = [UIButton buttonWithType:UIButtonTypeSystem];
+        open.frame = CGRectMake((frame.size.width - 54) / 2, 42, 54, 32);
         open.layer.cornerRadius = 12;
-
-        open.backgroundColor =
-        [[UIColor blackColor]
-        colorWithAlphaComponent:0.75];
-
-        [open setTitle:@"≡"
-        forState:UIControlStateNormal];
-
-        [open setTitleColor:
-        UIColor.whiteColor
-        forState:UIControlStateNormal];
-
-        [open addTarget:
-        [UnifiedMenu shared]
-        action:@selector(toggle)
-        forControlEvents:
-        UIControlEventTouchUpInside];
-
+        open.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.75];
+        [open setTitle:@"≡" forState:UIControlStateNormal];
+        [open setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
+        open.titleLabel.font = [UIFont boldSystemFontOfSize:20];
+        [open addTarget:[UnifiedMenuController shared] action:@selector(toggle) forControlEvents:UIControlEventTouchUpInside];
         [vc.view addSubview:open];
 
-        menuView =
-        [[UIView alloc]
-        initWithFrame:
-        CGRectMake(
-        (frame.size.width - 240) / 2,
-        90,
-        240,
-        240)];
+        gUnifiedMenuView = [[UIView alloc] initWithFrame:CGRectMake((frame.size.width - 240) / 2, 90, 240, 240)];
+        gUnifiedMenuView.layer.cornerRadius = 18;
+        gUnifiedMenuView.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.78];
+        [vc.view addSubview:gUnifiedMenuView];
 
-        menuView.layer.cornerRadius = 18;
-
-        menuView.backgroundColor =
-        [[UIColor blackColor]
-        colorWithAlphaComponent:0.78];
-
-        [vc.view addSubview:menuView];
-
-        [menuView addSubview:
-        MakeButton(
-        @"Link Instances",
-        20,
-        @selector(link))];
-
-        [menuView addSubview:
-        MakeButton(
-        @"Unlink",
-        70,
-        @selector(unlink))];
-
-        [menuView addSubview:
-        MakeButton(
-        @"Hide Menu",
-        120,
-        @selector(hide))];
-
-        [menuView addSubview:
-        MakeButton(
-        @"Remove UI",
-        170,
-        @selector(remove))];
+        [gUnifiedMenuView addSubview:UnifiedMakeButton(@"Link Instances", 20, @selector(link))];
+        [gUnifiedMenuView addSubview:UnifiedMakeButton(@"Unlink", 70, @selector(unlink))];
+        [gUnifiedMenuView addSubview:UnifiedMakeButton(@"Hide Menu", 120, @selector(hide))];
+        [gUnifiedMenuView addSubview:UnifiedMakeButton(@"Remove UI", 170, @selector(remove))];
     });
 }

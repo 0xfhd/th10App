@@ -1,26 +1,25 @@
 #import <Foundation/Foundation.h>
 #import <notify.h>
 
-static BOOL gLinked = NO;
+static BOOL gUnifiedLinked = NO;
 
 void HubEnable(void) {
-    gLinked = YES;
+    gUnifiedLinked = YES;
 }
 
 void HubDisable(void) {
-    gLinked = NO;
+    gUnifiedLinked = NO;
+}
+
+BOOL HubIsEnabled(void) {
+    return gUnifiedLinked;
 }
 
 void HubBroadcast(NSString *event) {
+    if (!gUnifiedLinked || event.length == 0) return;
 
-    if (!gLinked) return;
+    [[NSUserDefaults standardUserDefaults] setObject:event forKey:@"unified_event"];
+    [[NSUserDefaults standardUserDefaults] synchronize];
 
-    [[NSUserDefaults standardUserDefaults]
-    setObject:event
-    forKey:@"unified_event"];
-
-    [[NSUserDefaults standardUserDefaults]
-    synchronize];
-
-    notify_post("com.unified.hub");
+    notify_post("com.unified.realmerge.hub");
 }
